@@ -1,0 +1,624 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Domino's Analysis Console</title>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Barlow+Condensed:wght@500;600&display=swap">
+<style>
+/* Layout: Gotham-style operations workspace. Classification banner, command bar with object search, icon rail, dense windowed panels, status bar. */
+:root{
+  --bg:#0b0e12; --panel:#12161c; --panel2:#181d24; --line:#2a313b; --fg:#d3d9e0; --muted:#7f8a98;
+  --accent:#48aff0; --accent-soft:#12293a; --peer:#667385;
+  --good:#3dcc91; --warn:#ffc940; --bad:#f2566a;
+  --s1:#48aff0; --s2:#8abbff; --s3:#3dcc91; --s4:#ffc940; --s5:#c98cf0;
+  --f-disp:'Barlow Condensed','Arial Narrow',sans-serif; --f-body:'IBM Plex Sans',system-ui,sans-serif; --f-data:'IBM Plex Mono',ui-monospace,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);background-image:linear-gradient(color-mix(in srgb,var(--line) 40%,transparent) 1px,transparent 1px),linear-gradient(90deg,color-mix(in srgb,var(--line) 40%,transparent) 1px,transparent 1px);background-size:44px 44px;color:var(--fg);font:14px/1.45 var(--f-body);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px}
+button,select,input{font:inherit;color:inherit}
+.wrap{max-width:1500px;margin:0 auto;display:flex;flex-direction:column;gap:10px}
+.banner{background:var(--accent-soft);border:1px solid color-mix(in srgb,var(--accent) 45%,var(--line));color:var(--accent);font:500 11px var(--f-data);letter-spacing:.14em;text-align:center;padding:3px 8px;text-transform:uppercase}
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:10px 24px;background:var(--panel);border:1px solid var(--line);padding:8px 14px}
+.brand{font:600 21px/1 var(--f-disp);letter-spacing:.08em;display:flex;align-items:center;gap:10px}
+.brand i{width:20px;height:20px;display:block;background:var(--accent);clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)}
+.brand small{font:400 11px var(--f-data);color:var(--muted);letter-spacing:.02em;display:block;margin-top:3px}
+.cmd{position:relative;flex:1 1 260px;max-width:460px;margin-inline:auto}
+.cmd input{width:100%;background:var(--bg);border:1px solid var(--line);padding:7px 10px 7px 30px;font:13px var(--f-data);border-radius:2px;outline-offset:2px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237f8a98' stroke-width='2'%3E%3Ccircle cx='10' cy='10' r='6'/%3E%3Cpath d='M15 15l6 6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:8px 50%;background-size:15px}
+#res{position:absolute;left:0;right:0;top:100%;z-index:40;background:var(--panel2);border:1px solid var(--line);margin-top:2px;max-height:300px;overflow:auto}
+#res button{display:flex;justify-content:space-between;gap:12px;width:100%;text-align:left;background:none;border:0;padding:7px 10px;cursor:pointer;font-size:13px}
+#res button small{color:var(--muted);font:11px var(--f-data)}
+#res button:hover,#res button.on{background:var(--accent-soft)}
+.tick{display:flex;flex-direction:column;min-width:0}
+.tick>span{font:11px var(--f-data);color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.tick b{font:500 16px var(--f-data);font-variant-numeric:tabular-nums}
+.chip{font:500 12px var(--f-data);padding:2px 9px;border-radius:2px;border:1px solid currentColor;display:inline-block}
+.chip.BUY{color:var(--good)}.chip.HOLD{color:var(--warn)}.chip.SELL{color:var(--bad)}
+.app{display:grid;grid-template-columns:68px minmax(0,1fr);gap:10px;align-items:start}
+.rail{display:flex;flex-direction:column;gap:2px;background:var(--panel);border:1px solid var(--line);padding:4px;position:sticky;top:10px}
+.rail button{background:none;border:0;border-left:2px solid transparent;cursor:pointer;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 2px}
+.rail button svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.rail button span{font:500 10px var(--f-data);letter-spacing:.02em}
+.rail button:hover{background:var(--panel2);color:var(--fg)}
+.rail button[aria-selected="true"]{border-left-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.rail hr{border:0;border-top:1px solid var(--line);margin:3px 4px;width:calc(100% - 8px)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+main{min-width:0}
+.head{margin-bottom:10px;padding:2px 0 0}
+.head h1{font:600 clamp(24px,3vw,34px)/1.08 var(--f-disp);letter-spacing:.02em;margin:0 0 4px;text-wrap:balance}
+.head p{margin:0;color:var(--muted);max-width:84ch;font-size:13px}
+.grid{display:grid;gap:10px;grid-template-columns:repeat(12,minmax(0,1fr))}
+.p{background:var(--panel);border:1px solid var(--line);min-width:0;display:flex;flex-direction:column}
+.p>header{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;justify-content:space-between;padding:7px 10px;border-bottom:1px solid var(--line);background:var(--panel2)}
+.p>header h2{margin:0;font:500 11px var(--f-data);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:8px}
+.p>header h2::before{content:"";width:6px;height:6px;background:var(--accent);display:inline-block}
+.p .body{padding:12px;min-width:0;flex:1}
+.c12{grid-column:span 12}.c8{grid-column:span 8}.c7{grid-column:span 7}.c6{grid-column:span 6}.c5{grid-column:span 5}.c4{grid-column:span 4}.c3{grid-column:span 3}
+@media (max-width:1100px){.c8,.c7,.c6,.c5,.c4{grid-column:span 12}.c3{grid-column:span 6}}
+@media (max-width:820px){.app{grid-template-columns:minmax(0,1fr)}.rail{flex-direction:row;overflow-x:auto;position:static}.rail button{min-width:64px;border-left:0;border-bottom:2px solid transparent}.rail button[aria-selected="true"]{border-bottom-color:var(--accent)}.rail hr{display:none}.c3{grid-column:span 12}}
+.kpis{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:10px}
+.kpi{background:var(--panel);border:1px solid var(--line);padding:8px 12px}
+.kpi>span{font:11px var(--f-data);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);display:block}
+.kpi b{font:500 23px/1.25 var(--f-data);font-variant-numeric:tabular-nums;display:block}
+.kpi em{font:400 12px var(--f-body);font-style:normal;color:var(--muted)}
+#vk,#ck{grid-template-columns:repeat(auto-fit,minmax(118px,1fr))}#ck .kpi b{font-size:20px}#vk .kpi b{font-size:20px}#mk .kpi b{font-size:19px}
+.up{color:var(--good)}.dn{color:var(--bad)}
+.seg{display:inline-flex;border:1px solid var(--line);overflow:hidden}
+.seg button{background:var(--bg);border:0;padding:3px 10px;cursor:pointer;font:12px var(--f-data);color:var(--muted)}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:#06121b}
+select{background:var(--bg);border:1px solid var(--line);padding:3px 8px;font:12px var(--f-data);max-width:100%;border-radius:0}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{font:500 11px var(--f-data);color:var(--muted);text-align:right;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap;letter-spacing:.04em}
+th:first-child,td:first-child{text-align:left}
+td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:right;font-family:var(--f-data);font-variant-numeric:tabular-nums;white-space:nowrap}
+td:first-child{font-family:var(--f-body);white-space:normal}
+tr.sel td,tr[data-hl].on td{background:var(--accent-soft)}
+tr[data-row]{cursor:pointer}tr[data-row]:hover td{background:var(--panel2)}
+.scroll{overflow-x:auto}
+svg{display:block;width:100%;height:auto;overflow:visible}
+svg text{font:11px var(--f-data);fill:var(--muted)}
+svg .lab{fill:var(--fg)}
+svg .gl{stroke:var(--line);stroke-width:1}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;margin-right:5px;vertical-align:-1px}
+.note{font-size:12px;color:var(--muted);margin:8px 0 0}
+.msg{border-left:2px solid var(--accent);background:var(--panel2);padding:8px 12px;margin:0;font-size:13px}
+#tip{position:fixed;z-index:50;pointer-events:none;background:#e8edf3;color:#0b0e12;font:12px/1.35 var(--f-data);padding:5px 8px;max-width:260px;opacity:0;transition:opacity .08s}
+[data-tip]{cursor:default}
+.node{cursor:pointer}
+.node .sh{fill:var(--panel2);stroke-width:2}
+.node:hover .sh,.node.on .sh{stroke-width:3.5}
+.node.on .sh{filter:drop-shadow(0 0 7px var(--accent))}
+.edge{fill:none;stroke:var(--peer);opacity:.5}
+.edge.flow{stroke-dasharray:5 9;animation:dash 1.4s linear infinite}
+@keyframes dash{to{stroke-dashoffset:-28}}
+@media (prefers-reduced-motion:reduce){.edge.flow{animation:none}}
+.insp h3{margin:0 0 2px;font:600 24px/1.1 var(--f-disp);letter-spacing:.03em}
+.insp .type{font:11px var(--f-data);color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.08em}
+.insp h4{margin:14px 0 6px;font:500 11px var(--f-data);letter-spacing:.1em;color:var(--muted);text-transform:uppercase;border-top:1px solid var(--line);padding-top:10px}
+.insp dl{margin:0;display:grid;grid-template-columns:1fr auto;gap:4px 12px}
+.insp dt{color:var(--muted);font-size:13px}.insp dd{margin:0;font:500 13px var(--f-data);text-align:right}
+.insp p{margin:10px 0;font-size:13px}
+.links{display:flex;flex-direction:column;gap:3px}
+.links button{display:flex;justify-content:space-between;gap:8px;background:var(--bg);border:1px solid var(--line);padding:5px 8px;cursor:pointer;font-size:13px;text-align:left}
+.links button:hover{border-color:var(--accent)}
+.links small{font:11px var(--f-data);color:var(--muted)}
+.btn{background:var(--accent);color:#06121b;border:0;padding:6px 12px;cursor:pointer;font:500 13px var(--f-body)}
+.btn.ghost{background:none;color:var(--accent);border:1px solid var(--accent)}
+.sl{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 8px;margin-bottom:12px}
+.sl label{font-size:13px}.sl output{font:500 13px var(--f-data);text-align:right}
+.sl input{grid-column:1/-1;width:100%;accent-color:var(--accent)}
+.sl.ch output{color:var(--accent)}
+.sl small{grid-column:1/-1;color:var(--muted);font-size:11px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips button{background:var(--bg);border:1px solid var(--line);padding:3px 10px;font:12px var(--f-data);cursor:pointer}
+.chips button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#06121b}
+.heat{display:grid;grid-template-columns:auto repeat(5,minmax(0,1fr));gap:2px;font:12px var(--f-data);font-variant-numeric:tabular-nums}
+.heat div{padding:7px 4px;text-align:center}
+.heat .h{color:var(--muted);background:none}
+.heat .BUY{background:color-mix(in srgb,var(--good) 26%,var(--panel))}.heat .HOLD{background:color-mix(in srgb,var(--warn) 22%,var(--panel))}.heat .SELL{background:color-mix(in srgb,var(--bad) 28%,var(--panel))}
+.heat .cur{outline:2px solid var(--fg);outline-offset:-2px}
+.toggle{display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:10px}
+.status{display:flex;flex-wrap:wrap;gap:4px 22px;border:1px solid var(--line);background:var(--panel);padding:4px 12px;font:11px var(--f-data);color:var(--muted)}
+.status b{font-weight:500;color:var(--fg)}
+.bar{display:grid;grid-template-columns:104px minmax(0,1fr) 48px;gap:8px;align-items:center;margin-bottom:7px;font:12px var(--f-data)}
+.bar .tr{background:var(--bg);height:14px;position:relative;border:1px solid var(--line)}
+.tick input{width:96px;background:var(--bg);border:1px solid var(--line);font:500 16px var(--f-data);color:var(--fg);padding:0 6px;border-radius:0}
+.lnk{background:none;border:0;color:var(--accent);font:12px var(--f-data);cursor:pointer;text-decoration:underline;padding:0 4px}
+.vb{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;background:var(--bg);border:1px solid var(--line);border-left:4px solid var(--c);padding:12px 14px;cursor:pointer}
+.vb b{font:600 24px var(--f-disp);letter-spacing:.06em;color:var(--c)}.vb span{font-size:13px;color:var(--muted)}
+.locked .tick,.locked .cmd,.locked .rail,.locked #status{display:none}.locked .app{grid-template-columns:minmax(0,1fr)}
+#gate{margin-left:auto;font:600 11px var(--f-data);letter-spacing:.04em;text-transform:uppercase;border:1px solid var(--line);background:var(--panel2);color:var(--muted);padding:6px 10px;cursor:pointer}#gate[aria-pressed="true"]{color:var(--good);border-color:var(--good)}
+.vb:hover:not([disabled]){background:var(--panel2)}.vb[disabled]{opacity:.5;cursor:not-allowed}
+.vb[aria-pressed="true"]{background:color-mix(in srgb,var(--c) 18%,var(--panel));border-color:var(--c)}
+</style>
+
+
+<script>
+/* Adaptador: la consola se escribió para el entorno de Claude (claude.use('db'|'user'|'mcp')). Aquí esas llamadas hablan con
+   las funciones de Cloudflare (/api/state, /api/vote, /api/admin, /api/quote). La página en sí no cambia. */
+(function(){
+ const ls=(k,v)=>{try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){}};
+ let uid=ls('uid');if(!uid){uid=(self.crypto&&crypto.randomUUID)?crypto.randomUUID():('u'+Math.random().toString(36).slice(2)+Date.now().toString(36));ls('uid',uid)}
+ const pw=()=>{try{return sessionStorage.getItem('pw')||''}catch(e){return ''}};
+ const post=async(url,body)=>{let r;try{r=await fetch(url,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)})}catch(e){throw{code:'unavailable',message:'network'}}
+  if(!r.ok)throw{code:r.status===401||r.status===403?'permission-denied':'unavailable',message:'http '+r.status};return r.json()};
+ const admin=b=>post('/api/admin',{pw:pw(),...b}).then(x=>{pull();return x});
+ const subs=new Set();let last=null,timer=null,busy=false;
+ async function pull(){if(busy)return;busy=true;try{const r=await fetch('/api/state',{cache:'no-store'});if(!r.ok)throw 0;last=await r.json();subs.forEach(f=>f(last))}catch(e){subs.forEach(f=>f(null))}busy=false}
+ function start(){if(timer)return;pull();timer=setInterval(()=>{if(!document.hidden)pull()},4000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)pull()})}
+ function sub(cb,eb,pick){const f=s=>{if(s)cb(pick(s));else eb&&eb({code:'unavailable'})};subs.add(f);start();if(last)f(last);return()=>subs.delete(f)}
+ const db={
+  doc:p=>({
+   set:d=>p==='poll/state'?admin({action:'setPoll',round:d.round,open:d.open,reveal:d.reveal}):p==='site/state'?admin({action:'setSite',show:d.show}):post('/api/vote',{id:p.split('/')[1],pre:d.pre,post:d.post}).then(x=>{pull();return x}),
+   delete:()=>admin({action:'deleteVote',id:p.split('/')[1]}),
+   onSnapshot:(cb,eb)=>sub(cb,eb,s=>{const o=p==='poll/state'?s.poll:p==='site/state'?s.site:null;return{exists:!!o,data:()=>o}})}),
+  collection:p=>({onSnapshot:(cb,eb)=>sub(cb,eb,s=>({docs:(s.votes||[]).map(v=>({id:v.id,data:()=>({pre:v.pre||undefined,post:v.post||undefined})}))}))})};
+ let UP=null;
+ const user=()=>UP||(UP=(async()=>{let a=false;if(pw()){try{await post('/api/admin',{pw:pw(),action:'check'});a=true}catch(e){if(e&&e.code==='permission-denied'){try{sessionStorage.removeItem('pw')}catch(_){}}}}
+  return{id:async()=>uid,canEdit:async()=>a,isOwner:async()=>a,can:async()=>true}})());
+ const mcp={callTool:async(s,tool)=>{if(tool!=='GLOBAL_QUOTE')throw{code:'bad_request',message:'unsupported'};let r;try{r=await fetch('/api/quote')}catch(e){throw{code:'server_unavailable',message:'network'}}
+  if(!r.ok)throw{code:r.status===502?'tool_error':'server_not_connected',message:'quote '+r.status};return{payload:await r.json()}}};
+ window.claude={use:async n=>n==='db'?db:n==='user'?await user():n==='mcp'?mcp:null};
+ window.siteAuth={check:async p=>{try{await post('/api/admin',{pw:p,action:'check'});return true}catch(e){return false}},isAdmin:async()=>(await user()).canEdit()};
+})();
+</script>
+</head><body>
+<div class="wrap">
+  <div class="banner">FACA Challenge · Domino's Pizza, Inc. · Academic analysis · Figures from the group model</div>
+  <header class="top">
+    <div class="brand"><i></i><div>DOMINO'S ANALYSIS CONSOLE<small>NASDAQ: DPZ · model as of 2-Oct-2026</small></div></div>
+    <div class="cmd"><input id="q" type="text" placeholder="Search objects and modules  ( / )" autocomplete="off" aria-label="Search objects and modules"><div id="res" hidden></div></div>
+    <div class="tick"><span id="pxl">Price · model 2-Oct</span><b><input id="px" type="number" min="20" max="2000" step="0.01" value="297.62" aria-label="Share price in US dollars"> <button id="lvb" class="lnk" hidden>live</button><button id="pxr" class="lnk" hidden>model</button></b></div>
+    <div class="tick"><span>DCF value</span><b id="hv">–</b></div>
+    <div class="tick"><span>Upside</span><b id="hu">–</b></div>
+    <div class="tick"><span>Rating</span><b id="hr">–</b></div>
+    <button id="gate" hidden aria-pressed="false" title="Controls whether other viewers can see the full console or only the vote">Class view: locked</button>
+  </header>
+  <div class="app">
+    <nav class="rail" id="rail" role="tablist" aria-label="Modules"></nav>
+    <main id="main"></main>
+  </div>
+  <footer class="status" id="status"></footer>
+</div>
+<div id="tip"></div>
+
+
+<script>
+/* ---------- helpers ---------- */
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const fm=(v,d=0)=>v.toLocaleString('en-US',{maximumFractionDigits:d,minimumFractionDigits:d});
+const usd=v=>(v<0?'-$':'$')+fm(Math.abs(v))+'M';
+const pct=(v,d=1)=>(v*100).toFixed(d)+'%';
+const x2=(v,d=2)=>v.toFixed(d)+'x';
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function nice(min,max,n=5){if(min===max){max=min+1}const span=max-min,step0=span/n,mag=Math.pow(10,Math.floor(Math.log10(step0))),r=step0/mag,step=(r<1.5?1:r<3?2:r<7?5:10)*mag;const a=Math.floor(min/step)*step,b=Math.ceil(max/step)*step,t=[];for(let v=a;v<=b+step/2;v+=step)t.push(+v.toFixed(10));return t}
+const tipEl=$('#tip');
+document.addEventListener('mousemove',e=>{const t=e.target.closest&&e.target.closest('[data-tip]');if(t){tipEl.textContent=t.getAttribute('data-tip');tipEl.style.opacity=1;const w=tipEl.offsetWidth;tipEl.style.left=Math.min(innerWidth-w-8,e.clientX+14)+'px';tipEl.style.top=(e.clientY+16)+'px'}else tipEl.style.opacity=0});
+
+/* ---------- data (from FACA_challenge_con_WACC.xlsx) ---------- */
+const Y=['FY23','FY24','FY25'];
+const D={
+ rev:[4479.358,4706.416,4939.994], gm:[1727.417,1848.502,1973.56], ebitda:[900.159,966.731,1042.801], ebit:[819.519,878.999,953.974], ni:[519.118,584.17,601.704], int:[184.792,178.848,181.092],
+ netFA:[857.608,831.735,822.258], oCA:[337.42,339.129,373.379], inv:[82.964,70.919,79.189], rec:[282.809,309.104,315.958], cash:[114.098,186.126,125.675], TA:[1674.899,1737.013,1716.459],
+ eq:[-4070.367,-3962.291,-3901.142], ncl:[5197.916,4086.842,5075.98], cl:[547.35,1612.462,541.621], nd:[4876.33,4789.212,4691.139], ndE:[5.417,4.954,4.499],
+ cfo:[590.864,624.897,792.062], capex:[-105.396,-112.885,-120.558], fcf:[485.468,512.012,671.504], fin:[-476.358,-532.223,-752.093], div:[169.772,209.945,236.861], bb:[265.779,304.631,350.265],
+ da:[80.64,87.732,88.827], oth:[-46.749,-10.528,60.207], wc:[37.855,-36.477,41.324], payout:[.839,.881,.976], dcash:[7.929,59.291,-28.439]
+};
+const SEG=[['Supply chain',2989.529,'--s1'],['U.S. franchise advertising',559.494,'--s2'],['U.S. royalties and fees',677.114,'--s3'],['International royalties',338.704,'--s4'],['U.S. company-owned stores',375.153,'--s5']];
+const RAT=[
+ ['I. Liquidity','Current ratio',[1.493,.561,1.651],[1.212,1.333,1.15],x2,1],
+ ['','Quick ratio',[1.342,.517,1.505],[1.208,1.326,1.143],x2,1],
+ ['','Cash ratio',[.208,.115,.232],[.544,.423,.323],x2,1],
+ ['II. Long-term solvency','Total debt ratio',[3.43,3.281,3.273],[1.295,1.267,1.273],v=>pct(v,0),-1],
+ ['','Credit ratio (fin. debt / TA)',[2.98,2.864,2.806],[.784,.766,.764],v=>pct(v,0),-1],
+ ['','Times interest earned',[4.435,4.915,5.268],[3.952,4.297,3.927],x2,1],
+ ['III. Asset utilization','Total asset turnover',[2.674,2.709,2.878],[.795,.796,.727],x2,1],
+ ['','Fixed assets turnover',[5.223,5.659,6.008],[1.03,1.039,.918],x2,1],
+ ['','Days\' sales in inventory',[11.0,9.06,9.74],[3.07,3.04,3.41],v=>v.toFixed(1)+' d',-1],
+ ['','Days\' sales in receivables',[23.0,24.0,23.3],[28.0,26.4,26.7],v=>v.toFixed(1)+' d',-1],
+ ['IV. Profitability','Profit margin',[.116,.124,.122],[.16,.142,.133],v=>pct(v),1],
+ ['','Return on assets',[.31,.336,.351],[.123,.122,.091],v=>pct(v),1],
+ ['V. Market value','P/E',[27.7,25.4,23.9],[24.2,21.2,26.2],x2,0],
+ ['','EV / EBITDA',[21.5,20.5,18.4],[17.0,14.7,14.4],x2,0]
+];
+const PEERS=[
+ {n:'Domino\'s',t:'DPZ',d:true,rev:4939.994,ebitm:.1931,netm:.1218,roa:.3505,roic:.6224,lev:4.6191,cov:5.2679,beta:.95,per:16.86,evx:14.46,dy:.0268,us:.048},
+ {n:'Papa John\'s',t:'PZZA',rev:1970,ebitm:.0533,netm:.014,roa:.0773,roic:.1243,lev:3.84,cov:2.63,beta:1.11,per:24.3,evx:7.89,dy:.071,us:-.01},
+ {n:'Yum! Brands',t:'YUM',rev:8720,ebitm:.3247,netm:.2541,roa:.2269,roic:.5973,lev:4.21,cov:5.08,beta:.55,per:17.15,evx:16.26,dy:.022,us:-.082},
+ {n:'McDonald\'s',t:'MCD',rev:27700,ebitm:.4572,netm:.3172,roa:.1325,roic:.178,lev:3.28,cov:7.79,beta:.45,per:18.84,evx:14.59,dy:.0333,us:null}
+];
+const PM={rev:['Revenue (US$M)',v=>'$'+fm(v)+'M'],ebitm:['EBIT margin',v=>pct(v)],netm:['Net margin',v=>pct(v)],roa:['Return on assets',v=>pct(v)],roic:['ROIC (TTM)',v=>pct(v)],lev:['Debt / EBITDA',v=>x2(v)],cov:['Interest coverage',v=>x2(v)],beta:['Beta (5 yr)',v=>v.toFixed(2)],per:['P/E (TTM)',v=>x2(v,1)],evx:['EV / EBITDA (TTM)',v=>x2(v,1)],dy:['Dividend yield',v=>pct(v)],us:['U.S. sales growth',v=>pct(v)]};
+
+/* ---------- DCF engine: replica of the Valuation sheet, checked against its 9 scenarios ---------- */
+const F={rev:[5182053.706,5262228.8765,5472718.0316,5664263.1627,5834191.0576],ebitda:[1098595.3857,1115592.5218,1160216.2227,1200823.7905,1236848.5042],ebit:[1005318.419,1020872.402,1061707.2981,1098867.0536,1131833.0652],dnwc:[-3212.1462,-899.7743,-2362.2368,-2149.6355,-1907.0338],capex:[-129551.3427,-126293.493,-125872.5147,-124613.7896,-122518.0122]};
+const BASE={rf:.0529,beta:.95,erp:.042,tax:.218909102,g:.03,dm:0,mid:0,nd:0};
+const ND_ADJ=[0,216110,406327.797];
+let PRICE=297.62;const PRICE0=297.62,TARGET=376.78;
+function dcf(p,wo){const ke=p.rf+p.beta*p.erp,kd=p.rf+.009185,w=wo??(.690617161*ke+.309382839*kd*(1-p.tax));let pv=0,fcf=[];
+ for(let i=0;i<5;i++){const d=p.dm*F.rev[i],ebit=F.ebit[i]+d,ebitda=F.ebitda[i]+d,f=ebitda-p.tax*ebit+F.dnwc[i]+F.capex[i];fcf.push(f);pv+=f/Math.pow(1+w,i+1-p.mid)}
+ const tv=fcf[4]*(1+p.g)/(w-p.g),pvtv=tv/Math.pow(1+w,5-p.mid),ev=pv+pvtv,eq=ev-4691139+36070+ND_ADJ[p.nd],ps=eq/33627.992,v=ps*Math.pow(1+ke,277/365)-5.97;
+ return{w,ke,fcf,ev,pv,pvtv,eq,ps,v,up:v/PRICE-1,tvShare:pvtv/ev}}
+const rate=u=>u>.15?'BUY':u<-.10?'SELL':'HOLD';
+const SCEN=[['Base case',{}],['Bottom-up beta (1.05)',{beta:1.0529}],['Marginal tax rate 24.5%',{tax:.245}],['Mid-year convention',{mid:.5}],['Deduct restricted cash',{nd:1}],['Prudent: beta 1.05 + tax 24.5%',{beta:1.0529,tax:.245}],['Debt at market value (92%)',{nd:2}],['Weak demand: EBIT margin -1 pp',{dm:-.01}],['Pessimistic: margin -1 pp + beta + tax',{dm:-.01,beta:1.0529,tax:.245}]];
+let S={...BASE};
+
+/* ---------- chart primitives ---------- */
+function bars({w=620,h=280,cats,series,fmt=fm,line,pad,tipPre=''}){
+ const P={l:52,r:line?50:12,t:22,b:28,...pad},iw=w-P.l-P.r,ih=h-P.t-P.b;
+ const all=series.flatMap(s=>s.vals);const tk=nice(Math.min(0,...all),Math.max(0,...all)*1.08,5),lo=tk[0],hi=tk[tk.length-1];
+ const y=v=>P.t+ih-(v-lo)/(hi-lo)*ih;let o='';
+ tk.forEach(t=>{o+=`<line class="gl" x1="${P.l}" x2="${w-P.r}" y1="${y(t)}" y2="${y(t)}"/><text x="${P.l-6}" y="${y(t)+4}" text-anchor="end">${fm(t)}</text>`});
+ const bw=iw/cats.length,gap=bw*.22,sw=(bw-gap*2)/series.length;
+ cats.forEach((c,i)=>{o+=`<text x="${P.l+bw*i+bw/2}" y="${h-8}" text-anchor="middle" class="lab">${c}</text>`;
+  series.forEach((s,j)=>{const v=s.vals[i],x=P.l+bw*i+gap+sw*j,y0=y(0),yv=y(v);
+   o+=`<rect x="${x}" y="${Math.min(y0,yv)}" width="${sw-2}" height="${Math.max(1,Math.abs(yv-y0))}" style="fill:var(${s.c})" data-tip="${tipPre}${c} · ${s.name}: ${fmt(v)}"/>`;
+   o+=`<text x="${x+(sw-2)/2}" y="${v>=0?yv-5:yv+12}" text-anchor="middle" class="lab">${fmt(v)}</text>`})});
+ if(line){const lt=nice(0,Math.max(...line.vals)*1.25,4),lh=lt[lt.length-1],ly=v=>P.t+ih-v/lh*ih;
+  let pts=line.vals.map((v,i)=>[P.l+bw*i+bw/2,ly(v)]);o+=`<polyline fill="none" style="stroke:var(${line.c});stroke-width:2" points="${pts.map(p=>p.join(',')).join(' ')}"/>`;
+  pts.forEach((p,i)=>{o+=`<circle cx="${p[0]}" cy="${p[1]}" r="4" style="fill:var(${line.c})" data-tip="${cats[i]} · ${line.name}: ${line.fmt(line.vals[i])}"/><text x="${p[0]}" y="${p[1]-9}" text-anchor="middle" style="fill:var(${line.c})">${line.fmt(line.vals[i])}</text>`});
+  lt.forEach(t=>o+=`<text x="${w-P.r+6}" y="${ly(t)+4}">${(t*100).toFixed(0)}%</text>`)}
+ return `<svg viewBox="0 0 ${w} ${h}" role="img">${o}</svg>`}
+function legend(items){return `<div class="legend">${items.map(([n,c])=>`<span><i style="background:var(${c})"></i>${n}</span>`).join('')}</div>`}
+function seg(id,opts,cur){return `<div class="seg" id="${id}">${opts.map(([k,l])=>`<button data-k="${k}" aria-pressed="${k==cur}">${l}</button>`).join('')}</div>`}
+function bindSeg(id,fn){$$('#'+id+' button').forEach(b=>b.onclick=()=>{$$('#'+id+' button').forEach(x=>x.setAttribute('aria-pressed',x===b));fn(b.dataset.k)})}
+function panel(cls,title,right,body){return `<section class="p ${cls}"><header><h2>${title}</h2>${right||''}</header><div class="body">${body}</div></section>`}
+function kpi(l,v,e){return `<div class="kpi"><span>${l}</span><b>${v}</b><em>${e||''}</em></div>`}
+
+/* ---------- views ---------- */
+const V={};
+
+/* 0 · relationship map */
+const NODES={
+ cust:{x:80,y:275,k:'ent',t:'Customers',type:'Demand',c:'--muted',m:[['U.S. QSR pizza share','23.3%'],['U.S. sales vs 2024 (system)','+4.8%'],['U.S. same-store sales 2025','+3.0%']],txt:'Demand is the thesis risk: U.S. comparable sales slowed to +0.1% in Q2 2026.',go:'val'},
+ fr:{x:240,y:275,k:'ent',t:'Franchisees',type:'Counterparty',c:'--s1',m:[['Total stores','22,142'],['U.S. franchised','6,924'],['International','14,956'],['Share franchised','98.8%']],txt:'Franchisees fund and equip the stores. That is why Domino\'s needs so few assets.',go:'bs'},
+ sc:{x:440,y:80,k:'rev',t:'Supply chain',type:'Revenue stream',c:'--s1',m:[['FY25 revenue','$2,990M'],['Share of revenue','60.5%'],['Days of inventory','10 vs 3 industry']],txt:'Dough and ingredients sold to franchisees at cost-plus. Large revenue, low margin.',go:'pl'},
+ roy:{x:440,y:185,k:'rev',t:'Royalties and fees',type:'Revenue stream',c:'--s3',m:[['U.S. royalties and fees','$677M'],['International royalties','$339M'],['Combined share','20.6%']],txt:'High-margin income. Franchise-only margin exceeds 80%.',go:'pl'},
+ ad:{x:440,y:290,k:'rev',t:'Advertising fund',type:'Revenue stream',c:'--s2',m:[['U.S. franchise advertising','$559M'],['Share of revenue','11.3%']],txt:'Contributions from U.S. franchisees, spent on marketing.',go:'pl'},
+ co:{x:440,y:395,k:'rev',t:'Company stores',type:'Revenue stream',c:'--s5',m:[['U.S. company-owned','$375M'],['Stores','262'],['Share of revenue','7.6%']],txt:'The only retail exposure the company keeps.',go:'pl'},
+ pl:{x:650,y:240,k:'ent',t:'Income statement',type:'Domino\'s Pizza, Inc.',c:'--accent',m:[['Revenue','$4,940M'],['EBIT','$954M'],['EBIT margin','19.3%'],['Net income','$602M']],txt:'Revenue +10% and EBIT +16% in two years: operating leverage.',go:'pl'},
+ cf:{x:810,y:240,k:'cash',t:'Cash generation',type:'Cash flow',c:'--good',m:[['Cash from operations','$792M'],['Capex','$121M'],['Free cash flow','$672M'],['FCF / net income','112%']],txt:'Profit turns into cash. Capex is only 2.4% of revenue.',go:'cf'},
+ lend:{x:940,y:95,k:'cap',t:'Lenders',type:'Capital provider',c:'--bad',m:[['Securitized debt','~$4.8B'],['Net debt','$4,691M'],['Net debt / EBITDA','4.5x'],['Interest FY25','$181M']],txt:'$1.0B of new notes (Aug-2025) repaid $1.15B falling due. Interest is covered 5.3x.',go:'bs'},
+ sh:{x:940,y:390,k:'cap',t:'Shareholders',type:'Capital provider',c:'--s4',m:[['Dividends FY25','$237M'],['Net buybacks FY25','$350M'],['Payout FY25','98% of net income'],['Cumulative FY23-25','$1.54B']],txt:'92% of free cash flow went back to shareholders. Book equity is -$3.9B.',go:'cf'}
+};
+const SUB={sc:'$2,990M',roy:'$1,016M',ad:'$559M',co:'$375M',pl:'$4,940M revenue',cf:'$672M FCF',lend:'$4.8B debt',sh:'$587M paid',fr:'22,142 stores'};
+const EDGES=[['cust','fr',14,'retail sales',0],['cust','co',8,'',0],['fr','sc',30,'',1],['fr','roy',14,'',1],['fr','ad',10,'',1],['sc','pl',30,'',1],['roy','pl',14,'',1],['ad','pl',10,'',1],['co','pl',8,'',1],['pl','cf',16,'',1],['cf','lend',6,'',1],['cf','sh',12,'',1]];
+const LINKTXT={'cust>fr':'retail sales','fr>sc':'$2,990M purchases','fr>roy':'$1,016M royalties','fr>ad':'$559M advertising','sc>pl':'revenue','roy>pl':'revenue','ad>pl':'revenue','co>pl':'revenue','pl>cf':'cash conversion','cf>lend':'interest $181M','cf>sh':'$587M returned','cust>co':'retail sales'};
+function shape(k,x,y,c){const R=24;const st=`class="sh" style="stroke:var(${c})"`;
+ if(k==='ent')return `<polygon ${st} points="${x},${y-R-4} ${x+R+4},${y} ${x},${y+R+4} ${x-R-4},${y}"/>`;
+ if(k==='cash')return `<polygon ${st} points="${[0,1,2,3,4,5].map(i=>`${x+R*Math.cos(Math.PI/3*i)},${y+R*Math.sin(Math.PI/3*i)}`).join(' ')}"/>`;
+ if(k==='cap')return `<rect ${st} x="${x-R+2}" y="${y-R+2}" width="${2*R-4}" height="${2*R-4}"/>`;
+ return `<circle ${st} cx="${x}" cy="${y}" r="${R}"/>`}
+V.map=()=>{
+ let e='';EDGES.forEach(([a,b,wd,lab,fl])=>{const A=NODES[a],B=NODES[b],x1=A.x+26,y1=A.y,x2=B.x-26,y2=B.y,mx=(x1+x2)/2,wv=Math.max(1.5,Math.sqrt(wd)*1.4),d=`M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`;
+  e+=`<path class="edge" style="stroke-width:${wv}" d="${d}"/>`+(fl?`<path class="edge flow" style="stroke-width:1.5;stroke:var(--accent);opacity:.95" d="${d}"/>`:'');
+  if(lab&&Math.abs(x2-x1)<80)e+=`<text x="${x1+(A.x>900?-8:8)}" y="${(y1+y2)/2+4}" ${A.x>900?'text-anchor="end"':''} style="font-size:12px">${lab}</text>`});
+ let n='';Object.entries(NODES).forEach(([k,N])=>{n+=`<g class="node" data-k="${k}" tabindex="0" role="button" aria-label="${N.t}">${shape(N.k,N.x,N.y,N.c)}<text x="${N.x}" y="${N.y+46}" text-anchor="middle" class="lab" style="font:600 13px var(--f-body);paint-order:stroke;stroke:var(--bg);stroke-width:4px">${N.t}</text><text x="${N.x}" y="${N.y+61}" text-anchor="middle" style="font-size:12px;paint-order:stroke;stroke:var(--bg);stroke-width:4px">${SUB[k]||''}</text></g>`});
+ return `<div class="head"><h1>One franchise platform, three flows of money</h1><p>Select an object to open its properties and linked objects. Lines run in the direction money flows and their thickness follows size.</p></div>
+ <div class="grid">${panel('c8','Object graph · FY2025','<span class="legend"><span><i style="background:var(--s1)"></i>operating</span><span><i style="background:var(--good)"></i>cash</span><span><i style="background:var(--bad)"></i>debt</span><span><i style="background:var(--s4)"></i>equity</span></span>',`<svg viewBox="0 20 1010 450" role="group" aria-label="Object graph">${e}${n}</svg>`)}
+ ${panel('c4 insp','Object properties','',`<div id="insp"></div>`)}</div>`};
+V.map.after=()=>{const show=k=>{const N=NODES[k];$$('.node').forEach(x=>x.classList.toggle('on',x.dataset.k===k));
+  const links=EDGES.filter(E=>E[0]===k||E[1]===k).map(E=>{const o=E[0]===k?E[1]:E[0];return `<button data-o="${o}"><span>${NODES[o].t}</span><small>${LINKTXT[E[0]+'>'+E[1]]||''}</small></button>`}).join('');
+  $('#insp').innerHTML=`<h3>${N.t}</h3><div class="type">${N.type}</div><dl>${N.m.map(([a,b])=>`<dt>${a}</dt><dd>${b}</dd>`).join('')}</dl><p>${N.txt}</p><h4>Linked objects</h4><div class="links">${links}</div><h4>Open</h4><button class="btn" id="opn">Open module</button>`;
+  $('#opn').onclick=()=>go(N.go);$$('.links button').forEach(b=>b.onclick=()=>show(b.dataset.o))};
+ $$('.node').forEach(g=>{g.onclick=()=>show(g.dataset.k);g.onkeydown=e=>{if(e.key==='Enter'||e.key===' ')show(g.dataset.k)}});show(PENDING||'pl');PENDING=null};
+let PENDING=null;
+
+/* 1 · business model and P&L */
+V.pl=()=>`<div class="head"><h1>Operating leverage drove a 19.3% EBIT margin in FY2025</h1><p>Revenue grew 10% in two years while EBIT margin expanded 100 bps. 99% of stores are franchised, so store-level retail risk sits with franchisees.</p></div>
+ <div class="kpis">${kpi('Revenue FY25','$4,940M','+10% vs FY23')}${kpi('EBIT FY25','$954M','+16% vs FY23')}${kpi('EBIT margin','19.3%','from 18.3% in FY23')}${kpi('Gross margin','40.0%','from 38.6% in FY23')}${kpi('Stores','22,142','90 markets · 776 net openings')}</div>
+ <div class="grid">${panel('c7','Income statement (US$M)',seg('plm',[['rev','Revenue'],['gm','Gross margin'],['ebitda','EBITDA'],['ebit','EBIT'],['ni','Net income']],'rev'),`<div id="plc"></div>`)}
+ ${panel('c5','Revenue mix FY2025','',`<div id="mix"></div>`)}</div>`;
+V.pl.after=()=>{
+ const draw=k=>{const nm={rev:'Revenue',gm:'Gross margin',ebitda:'EBITDA',ebit:'EBIT',ni:'Net income'}[k],mg=D[k].map((v,i)=>v/D.rev[i]);
+  $('#plc').innerHTML=bars({cats:Y,series:[{name:nm,vals:D[k],c:'--s1'}],fmt:v=>fm(v),line:k==='rev'?null:{name:nm+' margin',vals:mg,c:'--s4',fmt:v=>pct(v)}})+(k==='rev'?'':legend([[nm+' (US$M)','--s1'],['Margin on revenue (right axis)','--s4']]))};
+ draw('rev');bindSeg('plm',draw);
+ const tot=4939.994,R=88,cx=110,cy=110;let a=-Math.PI/2,arcs='';
+ SEG.forEach(([n,v,c],i)=>{const f=v/tot,b=a+f*2*Math.PI,big=f>.5?1:0,p=(ang,r)=>[cx+r*Math.cos(ang),cy+r*Math.sin(ang)],A=p(a,R),B=p(b,R),C=p(b,52),Dd=p(a,52);
+  arcs+=`<path d="M${A} A${R},${R} 0 ${big} 1 ${B} L${C} A52,52 0 ${big} 0 ${Dd} Z" style="fill:var(${c});stroke:var(--panel);stroke-width:2" data-seg="${i}" data-tip="${n}: ${usd(v)} (${pct(f)})"/>`;a=b});
+ $('#mix').innerHTML=`<svg viewBox="0 0 220 220" style="max-width:240px;margin:0 auto 8px">${arcs}<text x="110" y="106" text-anchor="middle" class="lab" style="font:500 15px var(--f-data)">$4,940M</text><text x="110" y="122" text-anchor="middle">FY2025</text></svg>
+ <table>${SEG.map(([n,v,c],i)=>`<tr data-hl="${i}"><td><span class="legend"><span><i style="background:var(${c})"></i>${n}</span></span></td><td>${usd(v)}</td><td>${pct(v/tot)}</td></tr>`).join('')}</table>
+ <p class="note">Supply chain is most of revenue but sells dough at cost-plus. The margin comes from royalties, where franchise-only margin exceeds 80%.</p>`;
+ const hl=i=>{$$('#mix path').forEach(p=>p.style.opacity=(i==null||p.dataset.seg==i)?1:.35);$$('#mix tr').forEach(r=>r.classList.toggle('on',r.dataset.hl==i))};
+ $$('#mix [data-seg],#mix tr').forEach(el=>{el.onmouseenter=()=>hl(el.dataset.seg??el.dataset.hl);el.onmouseleave=()=>hl(null)})};
+
+/* 2 · balance sheet */
+V.bs=()=>`<div class="head"><h1>Negative equity of -$3.90B comes from buybacks, not losses</h1><p>Net income was positive every year. Franchisees fund the stores, so net fixed assets are only 48% of assets. The risk is the balance sheet, not the business.</p></div>
+ <div class="kpis">${kpi('Total assets FY25','$1,716M','flat since FY23')}${kpi('Book equity','-$3,901M','narrowed from -$4,070M')}${kpi('Net debt','$4,691M','FY23: $4,876M')}${kpi('Net debt / EBITDA','4.5x','FY23: 5.4x')}${kpi('Current ratio','1.65x','FY24: 0.56x, notes due')}</div>
+ <div class="grid">${panel('c7','Balance sheet (US$M)',seg('bsy',[[0,'FY23'],[1,'FY24'],[2,'FY25']],2),`<div id="bsc"></div>`)}
+ ${panel('c5','Net debt / EBITDA','',`<div id="nde"></div><p class="note">Net debt fell $185M over two years while EBITDA grew $143M. That is where the 0.9x of deleveraging comes from.</p>`)}</div>`;
+V.bs.after=()=>{
+ const draw=i=>{i=+i;const A=[['Net fixed assets',D.netFA[i],'--s1'],['Other current assets',D.oCA[i],'--s2'],['Receivables',D.rec[i],'--s3'],['Inventories',D.inv[i],'--s4'],['Cash',D.cash[i],'--s5']],
+  L=[['Non-current liab.',D.ncl[i],'--bad'],['Current liab.',D.cl[i],'--warn']];
+  const w=620,h=360,top=16,bot=330,hi=7000,lo=-4500,y=v=>top+(hi-v)/(hi-lo)*(bot-top);let o='';
+  nice(lo,hi,6).filter(t=>t>=lo&&t<=hi).forEach(t=>o+=`<line class="gl" x1="40" x2="${w}" y1="${y(t)}" y2="${y(t)}"/><text x="34" y="${y(t)+4}" text-anchor="end">${fm(t)}</text>`);
+  const col=(x,items,labelTotal)=>{let c=0;items.forEach(([n,v,cl])=>{const y0=y(c),y1=y(c+v);o+=`<rect x="${x}" y="${Math.min(y0,y1)}" width="150" height="${Math.abs(y1-y0)}" style="fill:var(${cl})" data-tip="${n}: ${usd(v)}"/>`;if(Math.abs(y1-y0)>16)o+=`<text x="${x+75}" y="${Math.min(y0,y1)+Math.abs(y1-y0)/2+4}" text-anchor="middle" style="fill:#fff;font-weight:500">${n} ${fm(v)}</text>`;c+=v});return c};
+  col(70,A);col(330,L);
+  o+=`<rect x="330" y="${y(0)}" width="150" height="${y(D.eq[i])-y(0)}" style="fill:var(--s5)" data-tip="Equity: ${usd(D.eq[i])}"/><text x="405" y="${y(D.eq[i]/2)+4}" text-anchor="middle" style="fill:#fff;font-weight:500">Equity ${fm(D.eq[i])}</text>`;
+  o+=`<line x1="40" x2="${w}" y1="${y(0)}" y2="${y(0)}" style="stroke:var(--fg);stroke-width:1.2"/><text x="145" y="${bot+22}" text-anchor="middle" class="lab">Assets ${fm(D.TA[i])}</text><text x="405" y="${bot+22}" text-anchor="middle" class="lab">Liabilities and equity ${fm(D.TA[i])}</text>`;
+  $('#bsc').innerHTML=`<svg viewBox="0 0 ${w} ${h}">${o}</svg><p class="note">${Y[i]}: liabilities of ${usd(D.ncl[i]+D.cl[i])} exceed assets of ${usd(D.TA[i])}; equity makes up the gap.${i===1?' Current liabilities jump because $1.15B of notes fall due within a year.':''}</p>`};
+ draw(2);bindSeg('bsy',draw);
+ $('#nde').innerHTML=bars({w:440,h:270,cats:Y,series:[{name:'Net debt / EBITDA',vals:D.ndE,c:'--bad'}],fmt:v=>x2(v,1),pad:{l:34}})};
+
+/* 3 · cash flow */
+V.cf=()=>`<div class="head"><h1>Operations generate the cash; financing hands it back</h1><p>FY25 free cash flow was 112% of net income. Over FY23-25, 92% of free cash flow went back to shareholders.</p></div>
+ <div class="kpis">${kpi('Free cash flow FY25','$672M','FY23: $485M (+38%)')}${kpi('FCF / net income','112%','FY23: 94%')}${kpi('Capex / revenue','2.4%','franchisees fund stores')}${kpi('Payout FY25','98%','of net income (FY23: 84%)')}${kpi('Financing outflow FY25','$752M','exceeds FCF of $672M')}</div>
+ <div class="grid">${panel('c7','From net income to free cash flow (US$M)',seg('cfy',[[0,'FY23'],[1,'FY24'],[2,'FY25']],2),`<div id="wf"></div>`)}
+ ${panel('c5','Sources and uses · FY23-25 cumulative (US$M)','',`<div id="su"></div>`)}</div>`;
+V.cf.after=()=>{
+ const draw=i=>{i=+i;const it=[['Net income',D.ni[i],0,'Net income'],['D&A',D.da[i],0,'D&A'],['Non-cash and other',D.oth[i],0,'Non-cash'],['Working capital',D.wc[i],0,'Work. cap.'],['Cash from operations',D.cfo[i],1,'CFO'],['Capex',D.capex[i],0,'Capex'],['Free cash flow',D.fcf[i],1,'FCF']];
+  const w=620,h=300,P={l:44,t:22,b:46},ih=h-P.t-P.b,hi=900,lo=0,y=v=>P.t+ih-(v-lo)/(hi-lo)*ih,bw=(w-P.l)/it.length;let o='',run=0;
+  nice(lo,hi,4).forEach(t=>o+=`<line class="gl" x1="${P.l}" x2="${w}" y1="${y(t)}" y2="${y(t)}"/><text x="${P.l-6}" y="${y(t)+4}" text-anchor="end">${fm(t)}</text>`);
+  it.forEach(([n,v,tot,sh],k)=>{const a=tot?0:run,b=tot?v:run+v;if(tot)run=v;else run=b;const x=P.l+bw*k+10,col=tot?'--accent':v>=0?'--good':'--bad';
+   o+=`<rect x="${x}" y="${y(Math.max(a,b))}" width="${bw-20}" height="${Math.max(1,Math.abs(y(a)-y(b)))}" style="fill:var(${col})" data-tip="${n}: ${usd(v)}"/><text x="${x+(bw-20)/2}" y="${y(Math.max(a,b))-5}" text-anchor="middle" class="lab">${v<0?'-':tot?'':'+'}${fm(Math.abs(v))}</text><text x="${x+(bw-20)/2}" y="${h-22}" text-anchor="middle">${sh}</text>`});
+  $('#wf').innerHTML=`<svg viewBox="0 0 ${w} ${h}">${o}</svg><p class="note">${Y[i]}: operations produced ${usd(D.cfo[i])}, financing absorbed ${pct(-D.fin[i]/D.cfo[i],0)} of it (dividends ${usd(D.div[i])}, net buybacks ${usd(D.bb[i])}). Cash moved ${D.dcash[i]>=0?'+':''}${fm(D.dcash[i])}.</p>`};
+ draw(2);bindSeg('cfy',draw);
+ const src=[['Cash from operations',2007.823,'--good','Operations'],['Debt issued',1014.898,'--s2','Debt issued'],['Asset sales (DPC Dash)',130.503,'--s4','']],use=[['Debt repaid and costs',1238.319,'--bad','Debt repaid'],['Share buybacks (net)',920.675,'--s5','Buybacks'],['Dividends',616.578,'--s4','Dividends'],['Capex',338.839,'--s1','Capex']];
+ const w=420,h=330,sc=h/3250;const col=(x,items)=>{let c=0,o='';items.forEach(([n,v,cl,sh])=>{const hh=v*sc;o+=`<rect x="${x}" y="${h-(c+v)*sc}" width="140" height="${hh-1.5}" style="fill:var(${cl})" data-tip="${n}: ${usd(v)}"/>`;if(hh>20&&sh)o+=`<text x="${x+70}" y="${h-(c+v)*sc+hh/2+3}" text-anchor="middle" style="fill:#fff;font-weight:500">${sh} ${fm(v)}</text>`;c+=v});return o};
+ $('#su').innerHTML=`<svg viewBox="0 0 ${w} ${h+24}">${col(40,src)}${col(240,use)}<text x="110" y="${h+18}" text-anchor="middle" class="lab">Sources 3,153</text><text x="310" y="${h+18}" text-anchor="middle" class="lab">Uses 3,114</text></svg><p class="note">Shareholder returns of $1,537M equal 92% of free cash flow ($1,669M). Debt flows are mostly refinancing.</p>`};
+
+/* 4 · ratios */
+V.ratios=()=>`<div class="head"><h1>Efficient, profitable and highly levered: the ratios in one view</h1><p>ROA is 4x the industry because assets turn 2.88x against 0.73x. Profit margin is below the industry median. Select a ratio to see its trend against the peer median.</p></div>
+ <div class="grid">${panel('c7','Scorecard · Domino\'s vs industry median (Papa John\'s, Yum!, McDonald\'s, Wendy\'s)','',`<div class="scroll"><table id="rt"><tr><th>Ratio</th><th>FY23</th><th>FY24</th><th>FY25</th><th>Industry FY25</th><th>Trend</th></tr>${RAT.map((r,i)=>`${r[0]?`<tr><td colspan="6" style="font:500 11px var(--f-body);color:var(--muted);padding-top:12px">${r[0]}</td></tr>`:''}<tr data-row="${i}"><td>${r[1]}</td>${r[2].map(v=>`<td>${r[4](v)}</td>`).join('')}<td>${r[4](r[3][2])}</td><td>${spark(r[2])}</td></tr>`).join('')}</table></div><p class="note">Debt-equity, equity multiplier, ROE and market-to-book are not meaningful: book equity is negative.</p>`)}
+ <div class="c5" style="display:flex;flex-direction:column;gap:12px;min-width:0">${panel('','','<span id="rttl" style="font-weight:600"></span>',`<div id="rc"></div>`)}${panel('','DuPont · ROA = margin × asset turnover','',`<div id="dp"></div>`)}</div></div>`;
+function spark(v){const w=64,h=20,mn=Math.min(...v),mx=Math.max(...v),p=v.map((x,i)=>[i*(w/2),h-2-(x-mn)/((mx-mn)||1)*(h-4)]);return `<svg viewBox="0 0 ${w} ${h}" style="width:64px;display:inline-block"><polyline fill="none" style="stroke:var(--accent);stroke-width:1.6" points="${p.map(a=>a.join(',')).join(' ')}"/><circle cx="${p[2][0]}" cy="${p[2][1]}" r="2.5" style="fill:var(--accent)"/></svg>`}
+V.ratios.after=()=>{
+ const pick=i=>{const r=RAT[i];$$('#rt tr[data-row]').forEach(t=>t.classList.toggle('sel',t.dataset.row==i));$('#rttl').textContent=r[1];
+  const f=r[4],fv=v=>f(v);$('#rc').innerHTML=bars({w:440,h:260,cats:Y,series:[{name:'Domino\'s',vals:r[2],c:'--s1'},{name:'Industry median',vals:r[3],c:'--peer'}],fmt:fv,pad:{l:40}})+legend([['Domino\'s','--s1'],['Industry median','--peer']])+`<p class="note">FY25: Domino\'s ${f(r[2][2])} vs industry ${f(r[3][2])}${r[1]==='Current ratio'?'. FY24 dips because $1.15B of notes fell due, refinanced in 2025.':''}</p>`};
+ $$('#rt tr[data-row]').forEach(t=>t.onclick=()=>pick(+t.dataset.row));pick(0);
+ const ox=(a,b)=>`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-family:var(--f-data)"><div class="kpi" style="flex:1;min-width:90px"><span>Profit margin</span><b>${a[0]}</b><em>industry ${b[0]}</em></div>×<div class="kpi" style="flex:1;min-width:90px"><span>Asset turnover</span><b>${a[1]}</b><em>industry ${b[1]}</em></div>=<div class="kpi" style="flex:1;min-width:90px;border-color:var(--accent)"><span>Return on assets</span><b>${a[2]}</b><em>industry ${b[2]}</em></div></div>`;
+ $('#dp').innerHTML=ox(['12.2%','2.88x','35.1%'],['13.3%','0.73x','9.1%'])+`<p class="note">Domino's does not earn more per dollar of sales. It sells more per dollar of assets, because franchisees own the stores.</p>`};
+
+/* 5 · benchmark */
+let PX='lev',PY='roic';
+V.peers=()=>{const opt=(s)=>Object.entries(PM).map(([k,v])=>`<option value="${k}" ${k===s?'selected':''}>${v[0]}</option>`).join('');
+ return `<div class="head"><h1>Against peers it wins on returns, not on margin</h1><p>Domino's ROIC of 62.2% beats Yum! (59.7%) and McDonald's (17.8%). It is also the most levered of the four. Revenue is not directly comparable: each peer books a different model.</p></div>
+ <div class="grid">${panel('c7','Peer map · bubble size is revenue',`<span style="display:flex;gap:8px;flex-wrap:wrap;font-size:12px;align-items:center"><label for="ppx">X</label><select id="ppx">${opt(PX)}</select><label for="ppy">Y</label><select id="ppy">${opt(PY)}</select></span>`,`<div id="bub"></div>`)}
+ ${panel('c5','Ranking','',`<div id="rank"></div>`)}
+ ${panel('c12','Peer table','',`<div class="scroll"><table><tr><th>Metric</th>${PEERS.map(p=>`<th>${p.t}</th>`).join('')}</tr>${Object.entries(PM).map(([k,m])=>`<tr><td>${m[0]}</td>${PEERS.map(p=>`<td>${p[k]==null?'n/a':m[1](p[k])}</td>`).join('')}</tr>`).join('')}</table></div><p class="note">Domino's: FY2025 for revenue, margins, ROA, leverage and coverage; trailing twelve months for ROIC, multiples and yield. Peers: trailing twelve months.</p>`)}</div>`};
+V.peers.after=()=>{
+ const draw=()=>{PX=$('#ppx').value;PY=$('#ppy').value;const w=620,h=360,P={l:52,r:20,t:20,b:40},xs=PEERS.map(p=>p[PX]),ys=PEERS.map(p=>p[PY]);
+  if(xs.includes(null)||ys.includes(null)){}
+  const ok=PEERS.filter(p=>p[PX]!=null&&p[PY]!=null),xv=ok.map(p=>p[PX]),yv=ok.map(p=>p[PY]),xt=nice(Math.min(0,...xv),Math.max(...xv)*1.1,5),yt=nice(Math.min(0,...yv),Math.max(...yv)*1.1,5),x0=xt[0],x1=xt[xt.length-1],y0=yt[0],y1=yt[yt.length-1],
+   X=v=>P.l+(v-x0)/(x1-x0)*(w-P.l-P.r),Y_=v=>h-P.b-(v-y0)/(y1-y0)*(h-P.t-P.b),maxR=Math.sqrt(27700);let o='';
+  const f=k=>k==='rev'||k==='lev'||k==='cov'||k==='per'||k==='evx'||k==='beta'?(v=>fm(v,k==='beta'?1:k==='rev'?0:1)):(v=>pct(v,0));
+  xt.forEach(t=>o+=`<line class="gl" x1="${X(t)}" x2="${X(t)}" y1="${P.t}" y2="${h-P.b}"/><text x="${X(t)}" y="${h-P.b+16}" text-anchor="middle">${f(PX)(t)}</text>`);
+  yt.forEach(t=>o+=`<line class="gl" x1="${P.l}" x2="${w-P.r}" y1="${Y_(t)}" y2="${Y_(t)}"/><text x="${P.l-6}" y="${Y_(t)+4}" text-anchor="end">${f(PY)(t)}</text>`);
+  o+=`<text x="${(w+P.l)/2}" y="${h-4}" text-anchor="middle" class="lab">${PM[PX][0]}</text><text transform="translate(12 ${h/2}) rotate(-90)" text-anchor="middle" class="lab">${PM[PY][0]}</text>`;
+  ok.forEach(p=>{const r=8+Math.sqrt(p.rev)/maxR*26;o+=`<circle cx="${X(p[PX])}" cy="${Y_(p[PY])}" r="${r}" style="fill:var(${p.d?'--accent':'--peer'});fill-opacity:${p.d?.85:.5};stroke:var(${p.d?'--accent':'--peer'});stroke-width:2" data-tip="${p.n}: ${PM[PX][1](p[PX])} · ${PM[PY][1](p[PY])} · revenue $${fm(p.rev)}M"/><text x="${X(p[PX])}" y="${Y_(p[PY])-r-5}" text-anchor="middle" class="lab" style="font-weight:600">${p.t}</text>`});
+  $('#bub').innerHTML=`<svg viewBox="0 0 ${w} ${h}">${o}</svg>${ok.length<4?'<p class="note">One peer has no figure for this metric and is left out.</p>':''}`;
+  const rk=PEERS.filter(p=>p[PY]!=null).sort((a,b)=>b[PY]-a[PY]),mx=Math.max(...rk.map(p=>Math.abs(p[PY])));
+  $('#rank').innerHTML=`<p class="note" style="margin:0 0 8px">${PM[PY][0]}</p>`+rk.map(p=>`<div style="display:grid;grid-template-columns:48px minmax(0,1fr) 70px;gap:8px;align-items:center;margin-bottom:8px"><b style="font:500 12px var(--f-data)">${p.t}</b><div style="background:var(--panel2);height:16px"><div style="width:${Math.abs(p[PY])/mx*100}%;height:100%;background:var(${p.d?'--accent':'--peer'})"></div></div><span style="font:500 12px var(--f-data);text-align:right">${PM[PY][1](p[PY])}</span></div>`).join('')};
+ $('#ppx').onchange=$('#ppy').onchange=draw;draw()};
+
+/* 6 · valuation lab */
+const SL=[['rf','Risk-free rate (10y Treasury)',.0429,.0629,.0005,v=>pct(v,2),'Close 30-Sep-26'],['beta','Levered beta',.6,1.3,.01,v=>v.toFixed(2),'5-year; bottom-up cross-check 1.05'],['erp','Equity risk premium',.03,.055,.0005,v=>pct(v,2),'Implied S&P 500, 1-Oct-26'],['g','Terminal growth g',.015,.045,.0025,v=>pct(v,2),'Base 3.0% ≈ inflation'],['tax','Tax rate',.18,.26,.0025,v=>pct(v,2),'Effective FY25 21.9%; marginal 24.5%'],['dm','EBIT margin vs base (pp)',-.03,.02,.0025,v=>(v>=0?'+':'')+(v*100).toFixed(2)+' pp','Base: flat 19.4% from 2026E']];
+V.val=()=>`<div class="head"><h1 id="vh">Recommendation: HOLD with a buy bias</h1><p>Every figure here is recomputed from the group's model. Move the assumptions and watch value per share, the rating and the sensitivity table change. Terminal value is about 80% of enterprise value, so WACC and g decide the result.</p></div>
+ <div class="grid">${panel('c4','Assumptions','<button class="btn ghost" id="rst">Reset to base</button>',`<div class="chips" id="pre" style="margin-bottom:14px">${SCEN.map((s,i)=>`<button data-i="${i}" aria-pressed="false">${s[0].split(':')[0]}</button>`).join('')}</div>
+   ${SL.map(([k,l,a,b,st,f,sm])=>`<div class="sl" id="sl_${k}"><label for="i_${k}">${l}</label><output id="o_${k}"></output><input id="i_${k}" type="range" min="${a}" max="${b}" step="${st}" value="${S[k]}"><small>${sm}</small></div>`).join('')}
+   <div class="toggle"><input type="checkbox" id="mid"><label for="mid">Mid-year discounting</label></div>
+   <div class="sl" style="margin-bottom:0"><label for="ndsel">Net debt treatment</label><span></span><select id="ndsel" style="grid-column:1/-1"><option value="0">Book value, $4,691M</option><option value="1">Also deduct restricted cash, $216M</option><option value="2">Debt at market value (92% of face)</option></select></div>`)}
+ <div class="c8" style="display:flex;flex-direction:column;gap:12px;min-width:0">
+  <div class="kpis" style="margin:0" id="vk"></div>
+  ${panel('','Share price map · what the rating means at today\'s value','',`<div id="pm"></div>`)}
+  <div class="grid" style="gap:12px">${panel('c6','Cash flow from assets (US$M)','',`<div id="fc"></div>`)}${panel('c6','Sensitivity · value per share, WACC × g','',`<div id="hm"></div>`)}</div>
+  ${panel('','Scenarios · value per share at 1-Oct-26','',`<div id="sc"></div>`)}</div></div>`;
+V.val.after=()=>{
+ const cnt=()=>{$('#mid').checked=!!S.mid;$('#ndsel').value=S.nd;SL.forEach(([k,,,,,f])=>{$('#i_'+k).value=S[k];$('#o_'+k).textContent=f(S[k]);$('#sl_'+k).classList.toggle('ch',Math.abs(S[k]-BASE[k])>1e-9)});
+  $$('#pre button').forEach((b,i)=>{const t={...BASE,...SCEN[i][1]};b.setAttribute('aria-pressed',Object.keys(BASE).every(k=>Math.abs(t[k]-S[k])<1e-9))})};
+ const upd=()=>{cnt();const R=dcf(S),r=rate(R.up);
+  $('#vh').textContent=`${r==='BUY'?'Buy':r==='SELL'?'Sell':'Hold'}: value of $${fm(R.v)} per share is ${R.up>=0?'+':''}${pct(R.up)} against $${fm(PRICE,2)}`;
+  $('#vk').innerHTML=kpi('WACC',pct(R.w,2),'Ke '+pct(R.ke,2))+kpi('Enterprise value','$'+fm(R.ev/1000)+'M','TV '+pct(R.tvShare,0)+' of EV')+kpi('Equity value','$'+fm(R.eq/1000)+'M','after $4,691M net debt')+kpi('Value / share','$'+fm(R.v,2),'rolled to 1-Oct-26')+kpi('Upside',`<span class="${R.up>=0?'up':'dn'}">${R.up>=0?'+':''}${pct(R.up)}</span>`,`<span class="chip ${r}">${r}</span>`);
+  hdr(R);
+  /* price map */
+  const w=760,h=110,lo=Math.min(200,Math.floor(PRICE*.75/10)*10),hi=Math.max(450,Math.ceil(PRICE*1.4/10)*10),X=v=>20+(v-lo)/(hi-lo)*(w-40),bp=R.v/1.15,sp=R.v/.9;
+  $('#pm').innerHTML=`<svg viewBox="0 0 ${w} ${h}"><rect x="${X(lo)}" y="40" width="${X(bp)-X(lo)}" height="22" style="fill:var(--good);fill-opacity:.35"/><rect x="${X(bp)}" y="40" width="${X(sp)-X(bp)}" height="22" style="fill:var(--warn);fill-opacity:.3"/><rect x="${X(sp)}" y="40" width="${X(hi)-X(sp)}" height="22" style="fill:var(--bad);fill-opacity:.35"/>
+   <text x="${(X(lo)+X(bp))/2}" y="55" text-anchor="middle" class="lab">BUY below $${fm(bp)}</text><text x="${(X(bp)+X(sp))/2}" y="55" text-anchor="middle" class="lab">HOLD</text><text x="${(X(sp)+X(hi))/2}" y="55" text-anchor="middle" class="lab">SELL above $${fm(sp)}</text>
+   ${[PRICE].map(v=>`<line x1="${X(v)}" x2="${X(v)}" y1="30" y2="72" style="stroke:var(--fg);stroke-width:2.5"/><text x="${X(v)}" y="24" text-anchor="middle" class="lab" style="font-weight:600">Price $${v}</text>`).join('')}
+   <line x1="${X(R.v)}" x2="${X(R.v)}" y1="40" y2="90" style="stroke:var(--accent);stroke-width:2.5"/><text x="${X(R.v)}" y="104" text-anchor="middle" style="fill:var(--accent)">Your value $${fm(R.v)}</text>
+   <line x1="${X(TARGET)}" x2="${X(TARGET)}" y1="40" y2="80" style="stroke:var(--muted);stroke-dasharray:3 3"/><text x="${X(TARGET)}" y="92" text-anchor="middle">Analysts $${fm(TARGET)}</text></svg><p class="note">Rule: buy if upside exceeds 15%, sell if the downside exceeds 10%, hold in between.</p>`;
+  /* FCF */
+  const act=[646.055,749.975],fc=R.fcf.map(v=>v/1000),b0=dcf(BASE).fcf.map(v=>v/1000);
+  $('#fc').innerHTML=bars({w:420,h:260,cats:['2024','2025','2026E','2027E','2028E','2029E','2030E'],series:[{name:'Cash flow from assets',vals:[...act,...fc],c:'--s1'}],fmt:v=>fm(v),pad:{l:40}})+`<p class="note">2030E: ${usd(fc[4])} ${Math.abs(fc[4]-b0[4])>.5?`(base ${usd(b0[4])})`:''}. Terminal value is built on this year.</p>`;
+  /* heat */
+  const ws=[-.01,-.005,0,.005,.01],gs=[.02,.025,.03,.035,.04];let hm='<div class="h"></div>'+gs.map(g=>`<div class="h">g ${pct(g,1)}</div>`).join('');
+  ws.forEach(dw=>{const W=R.w+dw;hm+=`<div class="h">WACC ${pct(W,2)}</div>`;gs.forEach(g=>{const q=dcf({...S,g},W),cur=dw===0&&Math.abs(g-S.g)<1e-9;hm+=`<div class="${rate(q.up)} ${cur?'cur':''}" data-tip="${pct(q.up)} vs price">$${fm(q.v)}</div>`})});
+  $('#hm').innerHTML=`<div class="heat">${hm}</div><p class="note">Green is buy territory, amber hold, red sell. Outlined cell is your current assumption (g snaps to the grid when it falls between columns).</p>`;
+  /* scenarios */
+  const sc=SCEN.map(([n,o])=>{const t={...BASE,...o},q=dcf(t);return[n,q.v,q.up]}).concat([['Analyst consensus',TARGET,TARGET/PRICE-1]]);
+  const mx=420,rows=sc.map(([n,v,u])=>{const cls=n==='Analyst consensus'?'--muted':rate(u)==='BUY'?'--good':rate(u)==='SELL'?'--bad':'--warn';return `<div style="display:grid;grid-template-columns:minmax(120px,230px) minmax(0,1fr) 92px;gap:10px;align-items:center;margin-bottom:6px"><span style="font-size:12px">${n}</span><div style="position:relative;background:var(--panel2);height:16px"><div style="width:${v/mx*100}%;height:100%;background:var(${cls})" data-tip="${n}: $${fm(v,2)} (${u>=0?'+':''}${pct(u)})"></div><i style="position:absolute;left:${PRICE/mx*100}%;top:-3px;bottom:-3px;width:2px;background:var(--fg)"></i></div><span style="font:500 12px var(--f-data);text-align:right">$${fm(v)} · ${u>=0?'+':''}${pct(u,0)}</span></div>`}).join('');
+  const yours=`<div style="display:grid;grid-template-columns:minmax(120px,230px) minmax(0,1fr) 92px;gap:10px;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid var(--line)"><b style="font-size:12px;color:var(--accent)">Your scenario</b><div style="position:relative;background:var(--panel2);height:16px"><div style="width:${R.v/mx*100}%;height:100%;background:var(--accent)"></div><i style="position:absolute;left:${PRICE/mx*100}%;top:-3px;bottom:-3px;width:2px;background:var(--fg)"></i></div><span style="font:500 12px var(--f-data);text-align:right">$${fm(R.v)} · ${R.up>=0?'+':''}${pct(R.up,0)}</span></div>`;
+  $('#sc').innerHTML=rows+yours+`<p class="note">The black tick marks the current price of $${fm(PRICE,2)}. ${sc.slice(0,9).filter(x=>x[1]>PRICE).length} of 9 model scenarios are above it (range $${fm(Math.min(...sc.slice(0,9).map(x=>x[1])))} to $${fm(Math.max(...sc.slice(0,9).map(x=>x[1])))}).</p>`};
+ SL.forEach(([k])=>$('#i_'+k).oninput=e=>{S[k]=+e.target.value;upd()});
+ $('#mid').onchange=e=>{S.mid=e.target.checked?.5:0;upd()};
+ $('#ndsel').onchange=e=>{S.nd=+e.target.value;upd()};
+ $('#rst').onclick=()=>{S={...BASE};upd()};
+ $$('#pre button').forEach(b=>b.onclick=()=>{S={...BASE,...SCEN[+b.dataset.i][1]};upd()});
+ upd()};
+
+/* 8 · Monte Carlo */
+const MCS=[['rf','Risk-free rate','sd',0,.01,.0005,v=>'sd '+(v*100).toFixed(2)+' pp'],['beta','Beta','sd',0,.25,.01,v=>'sd '+v.toFixed(2)],['erp','Equity risk premium','sd',0,.01,.0005,v=>'sd '+(v*100).toFixed(2)+' pp'],['g','Terminal growth g','range',0,.02,.0025,v=>'± '+(v*100).toFixed(2)+' pp'],['dm','EBIT margin vs base','sd',0,.03,.0025,v=>'sd '+(v*100).toFixed(2)+' pp'],['tax','Tax rate','sd',0,.03,.0025,v=>'sd '+(v*100).toFixed(2)+' pp']];
+const MC={n:10000,seed:7,sd:{rf:.004,beta:.10,erp:.004,g:.01,dm:.01,tax:.012}};
+function mulberry(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function simulate(){const r=mulberry(MC.seed),nrm=()=>{let u=0;while(!u)u=r();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*r())},
+ tri=(a,c,b)=>{if(b<=a)return c;const u=r(),Fc=(c-a)/(b-a);return u<Fc?a+Math.sqrt(u*(b-a)*(c-a)):b-Math.sqrt((1-u)*(b-a)*(b-c))},cl=(v,a,b)=>Math.min(b,Math.max(a,v));
+ const N=MC.n,vals=new Float64Array(N),inp={rf:new Float64Array(N),beta:new Float64Array(N),erp:new Float64Array(N),g:new Float64Array(N),dm:new Float64Array(N),tax:new Float64Array(N)};let i=0,rej=0;
+ while(i<N){const p={...S,rf:cl(S.rf+MC.sd.rf*nrm(),.01,.12),beta:cl(S.beta+MC.sd.beta*nrm(),.3,1.8),erp:cl(S.erp+MC.sd.erp*nrm(),.01,.1),g:tri(S.g-MC.sd.g,S.g,S.g+MC.sd.g),dm:S.dm+MC.sd.dm*nrm(),tax:cl(S.tax+MC.sd.tax*nrm(),.15,.3)};
+  const q=dcf(p);if(q.w-p.g<.015){rej++;continue}vals[i]=q.v;for(const k in inp)inp[k][i]=p[k];i++}
+ return{vals,inp,rej}}
+const pearson=(a,b)=>{const n=a.length;let ma=0,mb=0;for(let i=0;i<n;i++){ma+=a[i];mb+=b[i]}ma/=n;mb/=n;let sab=0,saa=0,sbb=0;for(let i=0;i<n;i++){const x=a[i]-ma,y=b[i]-mb;sab+=x*y;saa+=x*x;sbb+=y*y}return saa&&sbb?sab/Math.sqrt(saa*sbb):0};
+V.mc=()=>`<div class="head"><h1 id="mh">Monte Carlo valuation</h1><p>Each trial draws WACC inputs, terminal growth, margin and tax from a distribution centered on the Valuation lab assumptions and reruns the full DCF. The result is a range of values and a probability for each rating, instead of a single number.</p></div>
+ <div class="grid">${panel('c4','Input uncertainty',`<button class="btn ghost" id="mrst">Reset</button>`,`${MCS.map(([k,l,t,a,b,st,f])=>`<div class="sl" id="ms_${k}"><label for="mi_${k}">${l}</label><output id="mo_${k}"></output><input id="mi_${k}" type="range" min="${a}" max="${b}" step="${st}" value="${MC.sd[k]}"></div>`).join('')}
+   <div class="sl" style="margin-bottom:8px"><label for="mn">Trials</label><span></span><select id="mn" style="grid-column:1/-1">${[2000,10000,50000].map(n=>`<option value="${n}" ${n===MC.n?'selected':''}>${fm(n)}</option>`).join('')}</select></div>
+   <button class="btn" id="mrun">Run again with a new seed</button><p class="note" id="mnote"></p>`)}
+ <div class="c8" style="display:flex;flex-direction:column;gap:10px;min-width:0"><div class="kpis" style="margin:0" id="mk"></div>
+  ${panel('','Distribution of value per share · 1-Oct-26','<span class="legend" id="mlg"></span>',`<div id="mh2"></div>`)}
+  <div class="grid">${panel('c6','Rating probabilities','',`<div id="mr"></div>`)}${panel('c6','What drives the uncertainty','',`<div id="md"></div>`)}</div></div></div>`;
+V.mc.after=()=>{
+ const upd=()=>{MCS.forEach(([k,,,,,,f])=>{$('#mi_'+k).value=MC.sd[k];$('#mo_'+k).textContent=f(MC.sd[k])});
+  const {vals,inp,rej}=simulate(),N=vals.length,sorted=Float64Array.from(vals).sort(),q=p=>sorted[Math.min(N-1,Math.floor(p*N))];
+  let nb=0,nbuy=0,nsell=0;for(const v of vals){const u=v/PRICE-1;if(u>0)nb++;if(u>.15)nbuy++;else if(u<-.1)nsell++}
+  const pAbove=nb/N,pb=nbuy/N,ps=nsell/N,ph=1-pb-ps,base=dcf(S).v;
+  $('#mh').textContent=`In ${pct(pAbove,0)} of ${fm(N)} simulations the stock is worth more than $${fm(PRICE,2)}`;
+  $('#mk').innerHTML=kpi('Median value','$'+fm(q(.5)),'model $'+fm(base))+kpi('5th to 95th percentile','$'+fm(q(.05))+' to $'+fm(q(.95)),'range of outcomes')+kpi('Probability above price',pct(pAbove,0),'value > $297.62')+kpi('Probability of BUY',pct(pb,0),'upside above 15%')+kpi('Probability of SELL',pct(ps,0),'downside beyond 10%');
+  $('#mnote').textContent=`${fm(rej)} draws with WACC minus g below 1.5 pp were discarded and redrawn. The distributions are the group's illustrative assumptions, not market estimates. Seed ${MC.seed}.`;
+  /* histogram */
+  const lo=q(.005),hi=q(.995),B=40,bw=(hi-lo)/B,cnt=new Array(B).fill(0);for(const v of vals)cnt[Math.min(B-1,Math.max(0,Math.floor((v-lo)/bw)))]++;
+  const w=620,h=300,P={l:46,r:14,t:52,b:34},mx=Math.max(...cnt)/N,yt=nice(0,mx*1.1,4),yh=yt[yt.length-1],X=v=>P.l+(v-lo)/(hi-lo)*(w-P.l-P.r),Y=v=>h-P.b-v/yh*(h-P.t-P.b);let o='';
+  yt.forEach(t=>o+=`<line class="gl" x1="${P.l}" x2="${w-P.r}" y1="${Y(t)}" y2="${Y(t)}"/><text x="${P.l-6}" y="${Y(t)+4}" text-anchor="end">${pct(t,1)}</text>`);
+  cnt.forEach((c,i)=>{const mid=lo+(i+.5)*bw,r=rate(mid/PRICE-1),col=r==='BUY'?'--good':r==='SELL'?'--bad':'--warn';o+=`<rect x="${X(lo+i*bw)+.5}" y="${Y(c/N)}" width="${Math.max(1,X(lo+bw)-X(lo)-1)}" height="${h-P.b-Y(c/N)}" style="fill:var(${col});fill-opacity:.85" data-tip="$${fm(lo+i*bw)} to $${fm(lo+(i+1)*bw)}: ${pct(c/N,1)} of trials"/>`});
+  nice(lo,hi,6).filter(t=>t>=lo&&t<=hi).forEach(t=>o+=`<text x="${X(t)}" y="${h-P.b+16}" text-anchor="middle">$${fm(t)}</text>`);
+  const mk=(v,c,lab,ry,dash)=>v<lo||v>hi?'':`<line x1="${X(v)}" x2="${X(v)}" y1="${ry+4}" y2="${h-P.b}" style="stroke:var(${c});stroke-width:2;stroke-dasharray:${dash||0}"/><text x="${X(v)+5}" y="${ry+3}" style="fill:var(${c});font-weight:500">${lab}</text>`;
+  o+=mk(PRICE,'--fg','Price $'+fm(PRICE),12)+mk(base,'--accent','Model $'+fm(base),26)+mk(TARGET,'--muted','Analysts $377',40,'3 4');
+  $('#mh2').innerHTML=`<svg viewBox="0 0 ${w} ${h}">${o}</svg><p class="note">Share of trials in each $${fm(bw)} bucket. Bar color is the rating that value would earn against today's price.</p>`;
+  $('#mlg').innerHTML=`<span><i style="background:var(--good)"></i>BUY</span><span><i style="background:var(--warn)"></i>HOLD</span><span><i style="background:var(--bad)"></i>SELL</span>`;
+  /* rating stack */
+  $('#mr').innerHTML=`<div style="display:flex;height:34px;font:500 12px var(--f-data);color:#06121b"><div style="width:${pb*100}%;background:var(--good);display:flex;align-items:center;justify-content:center;min-width:0">${pb>.13?'BUY '+pct(pb,0):''}</div><div style="width:${ph*100}%;background:var(--warn);display:flex;align-items:center;justify-content:center;min-width:0">${ph>.13?'HOLD '+pct(ph,0):''}</div><div style="width:${ps*100}%;background:var(--bad);display:flex;align-items:center;justify-content:center;min-width:0">${ps>.13?'SELL '+pct(ps,0):''}</div></div><p class="note">BUY if upside exceeds 15%, SELL if the downside exceeds 10%, HOLD in between. The group's single-point answer is HOLD; the simulation shows how much of the distribution supports it.</p>`;
+  /* drivers */
+  const dn={rf:'Risk-free rate',beta:'Beta',erp:'Equity risk premium',g:'Terminal growth g',dm:'EBIT margin',tax:'Tax rate'},cr=Object.keys(inp).map(k=>[k,MC.sd[k]>0?pearson(inp[k],vals):0]).sort((a,b)=>Math.abs(b[1])-Math.abs(a[1]));
+  $('#md').innerHTML=cr.map(([k,c])=>`<div class="bar"><span style="font-size:12px;font-family:var(--f-body);white-space:normal">${dn[k]}</span><div class="tr"><i style="position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--muted)"></i><div style="position:absolute;top:0;bottom:0;${c>=0?'left:50%':'right:50%'};width:${Math.abs(c)*50}%;background:var(${c>=0?'--good':'--bad'})" data-tip="${dn[k]}: correlation ${c.toFixed(2)} with value"></div></div><span style="text-align:right">${c>=0?'+':''}${c.toFixed(2)}</span></div>`).join('')+`<p class="note">Correlation of each input with value per share across the trials. Bars to the right raise value when the input rises; bars to the left lower it. A zero-width input is switched off.</p>`};
+ MCS.forEach(([k])=>$('#mi_'+k).oninput=e=>{MC.sd[k]=+e.target.value;upd()});
+ $('#mn').onchange=e=>{MC.n=+e.target.value;upd()};$('#mrun').onclick=()=>{MC.seed=Math.floor(Math.random()*9000)+1;upd()};
+ $('#mrst').onclick=()=>{MC.sd={rf:.004,beta:.10,erp:.004,g:.01,dm:.01,tax:.012};MC.seed=7;upd()};upd()};
+
+/* 7 · capital allocation lab */
+const CAP={pay:587,bbs:.6,rate:null,px:null};
+const kd0=()=>S.rf+.009185;
+function capModel(c){const R=dcf(S),f=1/4.5,out=[];let D=4816.814,r=.037;
+ for(let i=0;i<5;i++){const rate=c.rate??kd0();r=r+f*(rate-r);const int=r*D,fcff=R.fcf[i]/1000,lf=fcff-int*(1-S.tax),pd=lf-c.pay,D1=D-pd,eb=(F.ebitda[i]+S.dm*F.rev[i])/1000,ebit=(F.ebit[i]+S.dm*F.rev[i])/1000;
+  out.push({y:2026+i,r,int,fcff,lf,div:c.pay*(1-c.bbs),bb:c.pay*c.bbs,pd,D:D1,lev:(D1-125.675)/eb,cov:ebit/int});D=D1}
+ return out}
+function lines({w=480,h=270,xs,series,yf,ylo,yhi}){const P={l:44,r:62,t:14,b:28},iw=w-P.l-P.r,ih=h-P.t-P.b,X=i=>P.l+i/(xs.length-1)*iw,Y=v=>P.t+ih-(Math.min(yhi,Math.max(ylo,v))-ylo)/(yhi-ylo)*ih;let o='';
+ nice(ylo,yhi,5).filter(t=>t>=ylo&&t<=yhi).forEach(t=>o+=`<line class="gl" x1="${P.l}" x2="${w-P.r}" y1="${Y(t)}" y2="${Y(t)}"/><text x="${P.l-6}" y="${Y(t)+4}" text-anchor="end">${yf(t)}</text>`);
+ xs.forEach((x,i)=>o+=`<text x="${X(i)}" y="${h-8}" text-anchor="middle">${x}</text>`);
+ series.forEach(s=>{o+=`<polyline fill="none" style="stroke:var(${s.c});stroke-width:${s.dash?1.6:2.6};stroke-dasharray:${s.dash||0}" points="${s.ys.map((v,i)=>X(i)+','+Y(v)).join(' ')}"/>`;
+  if(!s.dash)s.ys.forEach((v,i)=>o+=`<circle cx="${X(i)}" cy="${Y(v)}" r="3.5" style="fill:var(${s.c})" data-tip="${s.name} ${xs[i]}: ${yf(v)}"/>`);
+  const last=s.ys[s.ys.length-1];o+=`<text x="${X(xs.length-1)+8}" y="${Y(last)+(s.dash?16:4)}" style="fill:var(${s.c});font-weight:500">${yf(last)}</text>`});
+ return `<svg viewBox="0 0 ${w} ${h}">${o}</svg>`}
+const CAPSL=[['pay','Shareholder payout per year (US$M)',0,900,10,v=>'$'+fm(v)+'M','FY25: $587M (dividends $237M + net buybacks $350M)'],['bbs','Share of payout used for buybacks',0,1,.05,v=>pct(v,0),'FY25: 60%'],['rate','Interest rate on new and refinanced debt',.04,.09,.0025,v=>pct(v,2),'Default: today\'s 5-7 year Treasury plus the 2025 spread'],['px','Average buyback price (US$)',200,500,5,v=>'$'+fm(v),'Default: current share price']];
+V.cap=()=>`<div class="head"><h1 id="ch">Capital allocation lab</h1><p>Decide where the cash goes: to shareholders or to lenders. The lab rolls the group's 2026E-2030E forecast forward with interest on the securitized debt, and shows what each choice does to leverage, interest cover and the value created by buybacks.</p></div>
+ <div class="grid">${panel('c4','Policy','<button class="btn ghost" id="crst">Reset</button>',`<div class="chips" id="cpre" style="margin-bottom:14px"><button data-p="base" aria-pressed="false">FY25 policy</button><button data-p="delev" aria-pressed="false">Deleverage</button><button data-p="max" aria-pressed="false">Maximum returns</button><button data-p="shock" aria-pressed="false">Rate shock +150 bp</button></div>
+  ${CAPSL.map(([k,l,a,b,st,f,sm])=>`<div class="sl" id="cs_${k}"><label for="ci_${k}">${l}</label><output id="co_${k}"></output><input id="ci_${k}" type="range" min="${a}" max="${b}" step="${st}"><small>${sm}</small></div>`).join('')}
+  <p class="note">The forecast uses the model's unlevered cash flow less after-tax interest. It sits below FY25 reported free cash flow, which includes non-cash items and working capital. The effective interest rate starts at 3.7% and moves toward the new-issue rate as about 22% of the debt is refinanced each year.</p>`)}
+ <div class="c8" style="display:flex;flex-direction:column;gap:10px;min-width:0"><div class="kpis" style="margin:0" id="ck"></div>
+  <div class="grid">${panel('c6','Net debt / EBITDA','<span class="legend"><span><i style="background:var(--accent)"></i>your policy</span><span><i style="background:var(--muted)"></i>FY25 policy</span></span>',`<div id="cl1"></div>`)}${panel('c6','Interest cover (EBIT / interest)','',`<div id="cl2"></div>`)}</div>
+  ${panel('','Year by year (US$M)','',`<div class="scroll" id="ct"></div>`)}
+  ${panel('','What FY25 looked like','',`<div id="cf25"></div>`)}</div></div>`;
+V.cap.after=()=>{
+ const refCap={pay:587.126,bbs:.5966,rate:null,px:null};
+ const sync=()=>{CAPSL.forEach(([k,,,,,f])=>{const v=k==='rate'?(CAP.rate??kd0()):k==='px'?(CAP.px??PRICE):CAP[k];$('#ci_'+k).value=v;$('#co_'+k).textContent=f(v);$('#cs_'+k).classList.toggle('ch',k==='rate'?CAP.rate!=null:k==='px'?CAP.px!=null:Math.abs(v-refCap[k])>.001)});
+  const ps={base:Math.abs(CAP.pay-587)<1&&Math.abs(CAP.bbs-.6)<.001&&CAP.rate==null,delev:CAP.pay===300,max:CAP.pay===800,shock:CAP.rate!=null&&Math.abs(CAP.rate-(kd0()+.015))<1e-6};$$('#cpre button').forEach(b=>b.setAttribute('aria-pressed',!!ps[b.dataset.p]))};
+ const upd=()=>{sync();const rate=CAP.rate??kd0(),px=CAP.px??PRICE,m=capModel({...CAP,rate}),ref=capModel({...refCap,rate:kd0()}),R=dcf(S),last=m[4],cum=k=>m.reduce((a,x)=>a+x[k],0),bb=cum('bb'),xfer=bb*(R.v/px-1),shares=bb/px/33.628;
+  $('#ch').textContent=`At $${fm(CAP.pay)}M of payout a year, net debt / EBITDA reaches ${x2(last.lev,1)} in 2030E with interest cover of ${x2(last.cov,1)}`;
+  $('#ck').innerHTML=kpi('Net debt / EBITDA 2030E',x2(last.lev,1),'FY25 4.5x · FY25 policy '+x2(ref[4].lev,1))+kpi('Interest cover 2030E',x2(last.cov,1),'FY25 5.3x · FY25 policy '+x2(ref[4].cov,1))+kpi('Paid to shareholders','$'+fm(cum('div')+bb)+'M','2026E-2030E')+kpi('Net debt repaid',`<span class="${cum('pd')>=0?'up':'dn'}">${cum('pd')>=0?'':'-'}$${fm(Math.abs(cum('pd')))}M</span>`,cum('pd')>=0?'over five years':'net new borrowing')+kpi('Shares retired',pct(shares,1),'of 33.6M shares at a constant $'+fm(px))+kpi('Buyback value effect',`<span class="${xfer>=0?'up':'dn'}">${xfer>=0?'+':'-'}$${fm(Math.abs(xfer))}M</span>`,'DCF value $'+fm(R.v)+' vs $'+fm(px));
+  const xs=['FY25',...m.map(x=>x.y+'E')];
+  $('#cl1').innerHTML=lines({xs,series:[{name:'FY25 policy',ys:[4.499,...ref.map(x=>x.lev)],c:'--muted',dash:'4 4'},{name:'Your policy',ys:[4.499,...m.map(x=>x.lev)],c:'--accent'}],yf:v=>x2(v,1),ylo:2,yhi:6})+`<p class="note">Leverage falls mostly because EBITDA grows. Paying out more than levered free cash flow adds debt.</p>`;
+  $('#cl2').innerHTML=lines({xs,series:[{name:'FY25 policy',ys:[5.268,...ref.map(x=>x.cov)],c:'--muted',dash:'4 4'},{name:'Your policy',ys:[5.268,...m.map(x=>x.cov)],c:'--accent'}],yf:v=>x2(v,1),ylo:2,yhi:7})+`<p class="note">Interest cover falls as cheap debt is refinanced at today's rates. FY25 was 5.3x.</p>`;
+  const rows=[['Unlevered free cash flow',x=>fm(x.fcff)],['Effective interest rate',x=>pct(x.r,2)],['Interest expense',x=>fm(x.int)],['Free cash flow after interest',x=>fm(x.lf)],['Dividends',x=>fm(x.div)],['Net buybacks',x=>fm(x.bb)],['Debt repaid / (new borrowing)',x=>x.pd>=0?fm(x.pd):`<span class="dn">(${fm(-x.pd)})</span>`],['Gross debt, year end',x=>fm(x.D)],['Net debt / EBITDA',x=>x2(x.lev,2)],['Interest cover',x=>x2(x.cov,2)]];
+  $('#ct').innerHTML=`<table><tr><th>US$M</th>${m.map(x=>`<th>${x.y}E</th>`).join('')}</tr>${rows.map(([n,f])=>`<tr><td>${n}</td>${m.map(x=>`<td>${f(x)}</td>`).join('')}</tr>`).join('')}</table>`;
+  const prem=452/325.13-1,over=350.265*(1-325.13/452);
+  $('#cf25').innerHTML=`<div class="kpis" style="margin:0">${kpi('Free cash flow FY25','$672M','cash from operations less capex')}${kpi('Paid to shareholders','$587M','87% of FCF · 98% of net income')}${kpi('Net debt repaid','$165M','after $1.0B issued and $1.15B repaid')}${kpi('Average buyback price','~$452','DCF value at Dec-25: $325')}${kpi('Paid above value','~$'+fm(over)+'M','buybacks of $350M at +'+pct(prem,0))}</div><p class="note">The $452 average price is the figure on the group's slide 12 and $325.13 is the Dec-2025 value in the Valuation sheet. Buying back shares above intrinsic value transfers value from continuing shareholders to those who sell. At today's price, below the DCF value, the same buybacks add value.</p>`};
+ CAPSL.forEach(([k])=>$('#ci_'+k).oninput=e=>{const v=+e.target.value;if(k==='rate')CAP.rate=v;else if(k==='px')CAP.px=v;else CAP[k]=v;upd()});
+ $('#crst').onclick=()=>{CAP.pay=587;CAP.bbs=.6;CAP.rate=null;CAP.px=null;upd()};
+ $$('#cpre button').forEach(b=>b.onclick=()=>{const p=b.dataset.p;if(p==='base'){CAP.pay=587;CAP.bbs=.6;CAP.rate=null}else if(p==='delev'){CAP.pay=300}else if(p==='max'){CAP.pay=800}else{CAP.rate=kd0()+.015}upd()});
+ upd()};
+
+/* 8 · class vote */
+const VOTE={db:null,uid:null,admin:false,owner:false,canWrite:null,state:{round:'pre',open:false,reveal:false},votes:[],preview:false,err:null,subbed:false,confirm:false};
+const VR={BUY:['BUY','upside above 15%','--good'],HOLD:['HOLD','between -10% and +15%','--warn'],SELL:['SELL','downside beyond 10%','--bad']};
+V.vote=()=>`<div class="head"><h1>Where does the class stand: BUY, HOLD or SELL?</h1><p>Vote before the presentation and again after it. The presenter opens each round and decides when the results appear on screen.</p></div>
+ <div class="grid">${panel('c5','Your vote','<span id="vst"></span>',`<div id="vc"></div>`)}${panel('c7','Class result','',`<div id="vr"></div>`)}<div class="c12" id="va" hidden></div></div>`;
+function voteDraw(){if(CUR!=='vote'||!$('#vc'))return;const s=VOTE.state,mine=VOTE.votes.find(v=>v.id===VOTE.uid)||{},R=dcf(S),mr=rate(R.up),rl=s.round==='pre'?'before the presentation':'after the presentation',noDb=!VOTE.db,ro=VOTE.canWrite===false||VOTE.readOnly;
+ $('#vst').innerHTML=noDb?'':`<span class="chip ${s.open?'HOLD':''}" style="${s.open?'':'color:var(--muted)'}">${s.open?'Open · '+rl:'Closed'}</span>`;
+ if(noDb){$('#vc').innerHTML=`<p class="msg">Live voting works for people who open the shared link signed in to claude.ai. This view has no connection to the shared vote store.</p>`}
+ else{const can=s.open&&!ro;$('#vc').innerHTML=`<div style="display:grid;gap:8px">${Object.entries(VR).map(([k,[n,d,c]])=>`<button class="vb" data-v="${k}" ${can?'':'disabled'} aria-pressed="${mine[s.round]===k}" style="--c:var(${c})"><b>${n}</b><span>${d}</span></button>`).join('')}</div>
+  <p class="note">${ro?'Your access is view-only, so you can watch the result but not vote. Ask the presenter for Contributor access.':s.open?`Round open: ${rl}. You can change your vote until the round closes.`:'Voting is closed. The presenter opens it during the session.'}</p>
+  <p class="note">Your votes · before: <b style="color:var(--fg)">${mine.pre||'none'}</b> · after: <b style="color:var(--fg)">${mine.post||'none'}</b></p>`;
+  $$('#vc .vb').forEach(b=>b.onclick=async()=>{const body={...(mine.pre?{pre:mine.pre}:{}),...(mine.post?{post:mine.post}:{}),[s.round]:b.dataset.v,ts:Date.now()};try{await VOTE.db.doc('votes/'+VOTE.uid).set(body)}catch(e){VOTE.readOnly=true;voteDraw()}})}
+ const tally=r=>{const t={BUY:0,HOLD:0,SELL:0};VOTE.votes.forEach(v=>{if(v[r])t[v[r]]++});return t},tp=tally('pre'),tq=tally('post'),np=tp.BUY+tp.HOLD+tp.SELL,nq=tq.BUY+tq.HOLD+tq.SELL,show=s.reveal||(VOTE.admin&&VOTE.preview);
+ if(!VOTE.votes.length&&!show){$('#vr').innerHTML=`<p class="msg">No votes yet. Results appear here once the presenter reveals them.</p>`}
+ else if(!show){$('#vr').innerHTML=`<div class="kpis" style="margin:0">${kpi('Voted before',np,'people')}${kpi('Voted after',nq,'people')}</div><p class="note">Results are hidden until the presenter reveals them.</p>`}
+ else{const grp=(t,n,l)=>`<p class="note" style="margin:10px 0 6px">${l} · ${n} votes</p>`+Object.entries(VR).map(([k,[nm,,c]])=>`<div class="bar" style="grid-template-columns:54px minmax(0,1fr) 78px"><b style="color:var(${c})">${nm}</b><div class="tr"><div style="height:100%;width:${n?t[k]/n*100:0}%;background:var(${c})"></div></div><span style="text-align:right">${t[k]} · ${n?pct(t[k]/n,0):'0%'}</span></div>`).join(''),both=VOTE.votes.filter(v=>v.pre&&v.post),ch=both.filter(v=>v.pre!==v.post).length,top=t=>Object.entries(t).sort((a,b)=>b[1]-a[1])[0];
+  $('#vr').innerHTML=`${VOTE.admin&&VOTE.preview&&!s.reveal?'<p class="note" style="margin:0 0 6px;color:var(--warn)">Presenter preview. Others cannot see this yet.</p>':''}${grp(tp,np,'Before the presentation')}${grp(tq,nq,'After the presentation')}<p class="msg" style="margin-top:12px">Our model says <b>${mr}</b> (${R.up>=0?'+':''}${pct(R.up)} upside).${nq?` After the presentation the class majority is <b>${top(tq)[0]}</b>.`:''}${both.length?` ${ch} of ${both.length} people who voted twice changed their mind.`:''}</p>`}
+ const va=$('#va');if(VOTE.admin&&VOTE.db){va.hidden=false;va.innerHTML=panel('','Presenter controls','',`<div style="display:flex;flex-wrap:wrap;gap:8px"><button class="btn" data-a="pre">Open vote: before</button><button class="btn" data-a="post">Open vote: after</button><button class="btn ghost" data-a="close">Close voting</button><button class="btn ghost" data-a="reveal">${s.reveal?'Hide results':'Reveal results'}</button><button class="btn ghost" data-a="prev">${VOTE.preview?'Stop my preview':'Preview results (only me)'}</button>${VOTE.owner?`<button class="btn ghost" data-a="reset" style="${VOTE.confirm?'color:var(--bad);border-color:var(--bad)':''}">${VOTE.confirm?'Confirm: delete all votes':'Reset all votes'}</button>`:''}</div><p class="note">${np} voted before, ${nq} after. Only the page owner and editors see these controls.</p>`);
+  $$('#va [data-a]').forEach(b=>b.onclick=async()=>{const a=b.dataset.a,set=p=>VOTE.db.doc('poll/state').set({...VOTE.state,...p});try{if(a==='pre')await set({round:'pre',open:true,reveal:false});else if(a==='post')await set({round:'post',open:true,reveal:false});else if(a==='close')await set({open:false});else if(a==='reveal')await set({reveal:!VOTE.state.reveal,open:false});else if(a==='prev'){VOTE.preview=!VOTE.preview;voteDraw()}else if(a==='reset'){if(!VOTE.confirm){VOTE.confirm=true;voteDraw()}else{VOTE.confirm=false;await Promise.all(VOTE.votes.map(v=>VOTE.db.doc('votes/'+v.id).delete()));await set({open:false,reveal:false,round:'pre'})}}}catch(e){}})}else va.hidden=true};
+V.vote.after=async()=>{voteDraw();if(VOTE.subbed)return;VOTE.subbed=true;const c=window.claude;if(!c||!c.use)return;
+ try{const [db,user]=await Promise.all([c.use('db'),c.use('user')]);VOTE.db=db;if(user){VOTE.uid=await user.id();VOTE.admin=await user.canEdit();VOTE.owner=await user.isOwner();VOTE.canWrite=await user.can('data.write')}
+  if(db){db.collection('votes').onSnapshot(sn=>{VOTE.votes=sn.docs.map(d=>({id:d.id,...d.data()}));voteDraw()},e=>{VOTE.err=e.code;voteDraw()});db.doc('poll/state').onSnapshot(sn=>{VOTE.state={round:'pre',open:false,reveal:false,...(sn.exists?sn.data():{})};voteDraw()},e=>{VOTE.err=e.code;voteDraw()})}}catch(e){VOTE.err='unavailable'}voteDraw()};
+
+/* ---------- shell ---------- */
+const ICON={map:'<circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.3 11l7.4-4M8.3 13l7.4 4"/>',pl:'<path d="M5 20V12M12 20V5M19 20v-9"/>',bs:'<rect x="4" y="4" width="7" height="16"/><rect x="13" y="9" width="7" height="11"/>',cf:'<path d="M4 8h13l-3-3M20 16H7l3 3"/>',ratios:'<path d="M5 19L19 5"/><circle cx="7" cy="7" r="2"/><circle cx="17" cy="17" r="2"/>',peers:'<circle cx="7" cy="16" r="2"/><circle cx="12" cy="9" r="3"/><circle cx="18" cy="14" r="2"/><path d="M3 21h18M3 21V3"/>',val:'<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.5"/><path d="M12 2v4M12 18v4"/>',cap:'<path d="M12 3v18M16.5 7.5C15.5 6.3 14 6 12 6c-2.5 0-4 1-4 2.8 0 4 8.5 1.6 8.5 5.6 0 1.8-1.7 2.8-4.5 2.8-2 0-3.6-.6-4.6-1.8"/>',vote:'<rect x="4" y="4" width="16" height="16"/><path d="M8 12l3 3 5-6"/>',mc:'<path d="M3 20c3 0 3-14 9-14s6 14 9 14"/><path d="M3 20h18"/>'};
+const MODS=[['map','Map','Relationships and money flows'],['pl','P&L','Module 1 · Business model and income statement'],['bs','Balance','Module 2 · Balance sheet and capital structure'],['cf','Cash','Module 3 · Cash flow and uses of cash'],['ratios','Ratios','Module 4 · Financial ratio analysis'],['peers','Peers','Module 5 · Competitive benchmarking'],['val','Valuation','Module 6 · Valuation and thesis'],['mc','Simulate','Analytics · Monte Carlo valuation'],['cap','Capital','Analytics · Capital allocation lab'],['vote','Vote','Class vote · BUY, HOLD or SELL']];
+let CUR='map';
+function hdr(R){R=R||dcf(S);const r=rate(R.up);$('#hv').textContent='$'+fm(R.v,2);$('#hu').innerHTML=`<span class="${R.up>=0?'up':'dn'}">${R.up>=0?'+':''}${pct(R.up)}</span>`;$('#hr').innerHTML=`<span class="chip ${r}">${r}</span>`;stat()}
+function stat(){const R=dcf(S),m=MODS.find(x=>x[0]===CUR);$('#status').innerHTML=`<span>Source <b>FACA_challenge_con_WACC.xlsx</b></span><span>Market <b>${LIVE.msg}</b></span><span>View <b>${m?m[2]:''}</b></span><span>Valuation lab <b>$${fm(R.v,2)} · ${rate(R.up)}</b></span><span>US$ unless stated · FY ends late December</span>`}
+$('#rail').innerHTML=MODS.map(([k,n],i)=>`<button role="tab" data-k="${k}" aria-selected="false" aria-label="${MODS[i][2]}"><svg viewBox="0 0 24 24">${ICON[k]}</svg><span>${n}</span></button>${i===0||i===6||i===8?'<hr>':''}`).join('');
+function go(k,node){if(!V[k])k='map';if(!allowed(k))k='vote';CUR=k;PENDING=node||null;$$('#rail button').forEach(b=>b.setAttribute('aria-selected',b.dataset.k===k));$('#main').innerHTML=V[k]();V[k].after&&V[k].after();stat();try{history.replaceState(null,'','#'+k)}catch(e){}scrollTo(0,0)}
+$$('#rail button').forEach(b=>b.onclick=()=>go(b.dataset.k));
+/* object search */
+const IDX=[...MODS.map(m=>({l:m[2].replace(/^(Module \d|Analytics) · /,''),t:m[2].startsWith('Module')?m[2].split(' · ')[0]:m[2].startsWith('Analytics')?'Analytics':'Overview',k:m[0]})),...Object.entries(NODES).map(([k,N])=>({l:N.t,t:'Object · '+N.type,k:'map',n:k})),
+ {l:'WACC and cost of capital',t:'Valuation',k:'val'},{l:'Sensitivity table',t:'Valuation',k:'val'},{l:'Buybacks and dividends',t:'Capital allocation',k:'cap'},{l:'Refinancing and interest cover',t:'Capital allocation',k:'cap'},{l:'Live vote',t:'Class vote',k:'vote'},{l:'Probability of upside',t:'Monte Carlo',k:'mc'},{l:'Net debt / EBITDA',t:'Balance sheet',k:'bs'},{l:'Free cash flow',t:'Cash flow',k:'cf'},{l:'ROIC and ROA',t:'Benchmark',k:'peers'},{l:'DuPont analysis',t:'Ratios',k:'ratios'},{l:'Revenue mix',t:'Business model',k:'pl'}];
+let SI=0,SR=[];
+function sres(){const q=$('#q').value.trim().toLowerCase();SR=q?IDX.filter(i=>(i.l+' '+i.t).toLowerCase().includes(q)).slice(0,8):[];SI=0;const r=$('#res');r.hidden=!SR.length;r.innerHTML=SR.map((i,n)=>`<button data-n="${n}" class="${n===SI?'on':''}"><span>${i.l}</span><small>${i.t}</small></button>`).join('');$$('#res button').forEach(b=>b.onmousedown=e=>{e.preventDefault();pick(+b.dataset.n)})}
+function pick(n){const i=SR[n];if(!i)return;$('#q').value='';$('#res').hidden=true;$('#q').blur();go(i.k,i.n)}
+$('#q').oninput=sres;$('#q').onblur=()=>{$('#res').hidden=true};
+$('#q').onkeydown=e=>{if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();SI=(SI+(e.key==='ArrowDown'?1:-1)+SR.length)%Math.max(1,SR.length);$$('#res button').forEach((b,n)=>b.classList.toggle('on',n===SI))}else if(e.key==='Enter')pick(SI);else if(e.key==='Escape'){$('#q').value='';$('#res').hidden=true;$('#q').blur()}};
+document.addEventListener('keydown',e=>{if(/INPUT|SELECT|TEXTAREA/.test(e.target.tagName))return;if(e.key==='/'){e.preventDefault();$('#q').focus();return}const cur=MODS.findIndex(m=>m[0]===CUR);if(e.key==='ArrowRight')go(MODS[Math.min(MODS.length-1,cur+1)][0]);if(e.key==='ArrowLeft')go(MODS[Math.max(0,cur-1)][0])});
+/* ---------- live market data (Alpha Vantage connector, viewer's own credentials) ---------- */
+const AV='Alpha Vantage MCP Server';
+const LIVE={src:'model',px:null,day:null,chg:null,msg:'model price (2-Oct) · live feed not loaded',mcp:null,busy:false};
+function pxl(){const l=LIVE.src==='live'?'Price · live '+LIVE.day.slice(5):LIVE.src==='manual'?'Price · manual':'Price · model 2-Oct';$('#pxl').textContent=l;$('#pxr').hidden=Math.abs(PRICE-PRICE0)<.005;$('#lvb').hidden=!LIVE.mcp;$('#lvb').disabled=LIVE.busy}
+function setPrice(v,src){PRICE=v;LIVE.src=src;$('#px').value=v.toFixed(2);pxl();hdr();go(CUR)}
+$('#px').onchange=e=>{const v=parseFloat(e.target.value);if(v>=20&&v<=2000){PRICE=v;LIVE.src=Math.abs(v-PRICE0)<.005?'model':(LIVE.px&&Math.abs(v-LIVE.px)<.005?'live':'manual')}else e.target.value=PRICE;pxl();hdr();go(CUR)};
+$('#pxr').onclick=()=>setPrice(PRICE0,'model');
+$('#lvb').onclick=()=>fetchLive(true);
+async function fetchLive(force){
+ if(LIVE.busy)return;const c=window.claude;if(!c||!c.use)return;
+ const say=m=>{LIVE.msg=m;pxl();stat()};
+ try{
+  if(!LIVE.mcp)LIVE.mcp=await c.use('mcp');
+  if(!LIVE.mcp){say('model price (2-Oct) · live feed not available in this view');return}
+  LIVE.busy=true;pxl();
+  const r=await LIVE.mcp.callTool(AV,'GLOBAL_QUOTE',{symbol:'DPZ',datatype:'json'},{cache:force?{staleTime:0,gcTime:3600000,refresh:true}:{staleTime:600000,gcTime:3600000}});
+  let p=r.payload;if(typeof p==='string'){try{p=JSON.parse(p)}catch(e){}}
+  const q=p&&p['Global Quote'],px=q?parseFloat(q['05. price']):NaN;
+  if(!(px>20&&px<2000)){say('Alpha Vantage returned no quote (daily free limit?) · keeping '+(LIVE.src==='live'?'last live price':'model price'));return}
+  LIVE.px=px;LIVE.day=q['07. latest trading day'];LIVE.chg=q['10. change percent'];
+  LIVE.busy=false;
+  const t=r.cache?new Date(r.cache.storedAt).toISOString().slice(11,16)+' UTC':'just now';
+  LIVE.msg=`DPZ $${px.toFixed(2)} · ${LIVE.chg} · last close ${LIVE.day} · Alpha Vantage · fetched ${t}`;
+  if(LIVE.src!=='manual'||force)setPrice(px,'live');else{pxl();stat()}
+ }catch(e){
+  const k=e&&e.code;
+  say(k==='server_not_connected'||k==='selection_required'?'Alpha Vantage is not connected for this viewer (Settings → Connectors) · model price'
+   :k==='needs_reauth'?'Alpha Vantage needs reconnecting (Settings → Connectors) · model price'
+   :k==='not_in_manifest'||k==='approval_required'||k==='consent_required'?'Live feed not allowed for this page · model price'
+   :k==='tool_error'?'Alpha Vantage reported an error (limit?) · model price'
+   :k==='server_unavailable'?'Alpha Vantage unreachable right now · model price'
+   :'Live feed unavailable · model price');
+ }finally{LIVE.busy=false;pxl()}
+}
+/* ---------- access gate: only editors see everything until they open the class view; everyone else gets the vote ---------- */
+const GATE={admin:false,show:false,db:null,fetched:false};
+function allowed(k){return GATE.admin||GATE.show||k==='vote'}
+document.body.classList.add('locked');
+function gateApply(){const all=GATE.admin||GATE.show;document.body.classList.toggle('locked',!all);
+ $$('#rail button').forEach(b=>b.hidden=!allowed(b.dataset.k));
+ const g=$('#gate');g.hidden=!GATE.admin;g.textContent=GATE.show?'Class view: open':'Class view: locked';g.setAttribute('aria-pressed',String(GATE.show))}
+function boot(again){gateApply();pxl();hdr();go(again?CUR:((location.hash||'').slice(1)||'map'));if((GATE.admin||GATE.show)&&!GATE.fetched){GATE.fetched=true;fetchLive(false)}}
+$('#gate').onclick=async()=>{if(!GATE.db)return;const g=$('#gate');g.disabled=true;try{await GATE.db.doc('site/state').set({show:!GATE.show})}catch(e){g.textContent='Could not change (no permission)'}g.disabled=false};
+(async()=>{
+ try{const c=window.claude;const [user,db]=await Promise.race([Promise.all([c.use('user'),c.use('db')]),new Promise((_,j)=>setTimeout(j,6000))]);
+  GATE.admin=!!user&&await user.canEdit();GATE.db=db;
+  if(db)await new Promise(res=>{let first=true;db.doc('site/state').onSnapshot(sn=>{GATE.show=!!(sn.exists&&sn.data().show);if(first){first=false;res()}else boot(true)},()=>{if(first){first=false;res()}})});
+ }catch(e){}
+ boot(false);
+})();
+</script>
+<div id="pres"><button id="plogin" type="button">Presenter sign-in</button><form id="pform" hidden><input id="ppw" type="password" placeholder="Presenter password" autocomplete="current-password" aria-label="Presenter password"><button type="submit">OK</button></form></div>
+<style>#pres{position:fixed;right:10px;bottom:8px;z-index:5;display:flex;gap:6px;align-items:center}#plogin{background:none;border:0;color:var(--muted);font:11px var(--f-data);opacity:.55;cursor:pointer;text-decoration:underline}#plogin:hover{opacity:1}#pform{display:flex;gap:4px}#pform input,#pform button{font:12px var(--f-data);background:var(--panel2);color:var(--fg);border:1px solid var(--line);padding:5px 8px}#pform[hidden]{display:none}</style>
+<script>(async()=>{const b=document.getElementById('plogin'),f=document.getElementById('pform'),i=document.getElementById('ppw');
+ const adm=await siteAuth.isAdmin();b.textContent=adm?'Presenter · sign out':'Presenter sign-in';
+ b.onclick=()=>{if(adm){try{sessionStorage.removeItem('pw')}catch(e){}location.reload()}else{f.hidden=!f.hidden;i.focus()}};
+ f.onsubmit=async e=>{e.preventDefault();if(await siteAuth.check(i.value)){try{sessionStorage.setItem('pw',i.value)}catch(e){}location.reload()}else{i.value='';i.placeholder='Wrong password'}}})();</script>
+
+</body></html>
