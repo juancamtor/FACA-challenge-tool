@@ -8,7 +8,7 @@ export async function onRequestGet({ env, request, waitUntil }) {
   try {
     const r = await fetch("https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=DPZ&apikey=" + encodeURIComponent(env.AV_KEY));
     const j = await r.json();
-    if (!(j && j["Global Quote"] && j["Global Quote"]["05. price"])) return new Response(JSON.stringify({ error: "no quote" }), { status: 502, headers: { "content-type": "application/json" } });
+    if (!(j && j["Global Quote"] && j["Global Quote"]["05. price"])) return new Response(JSON.stringify({ error: "no quote", detail: j }), { status: 502, headers: { "content-type": "application/json" } });
     const res = new Response(JSON.stringify(j), { headers: { "content-type": "application/json", "cache-control": "public, max-age=1800" } });
     waitUntil(cache.put(key, res.clone()));
     return res;
