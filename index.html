@@ -161,13 +161,13 @@ svg .gl{stroke:var(--line);stroke-width:1}
  const subs=new Set();let last=null,timer=null,busy=false;
  async function pull(){if(busy)return;busy=true;try{const r=await fetch('/api/state',{cache:'no-store'});if(!r.ok)throw 0;last=await r.json();subs.forEach(f=>f(last))}catch(e){subs.forEach(f=>f(null))}busy=false}
  function start(){if(timer)return;pull();timer=setInterval(()=>{if(!document.hidden)pull()},4000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)pull()})}
- function sub(cb,eb,pick){const f=s=>{if(s)cb(pick(s));else eb&&eb({code:'unavailable'})};subs.add(f);start();if(last)f(last);return()=>subs.delete(f)}
+ function sub(cb,eb,pick){let prev=null;const f=s=>{if(!s){eb&&eb({code:'unavailable'});return}const r=pick(s),k=JSON.stringify(r[0]);if(k===prev)return;prev=k;cb(r[1])};subs.add(f);start();if(last)f(last);return()=>subs.delete(f)}
  const db={
   doc:p=>({
    set:d=>p==='poll/state'?admin({action:'setPoll',round:d.round,open:d.open,reveal:d.reveal}):p==='site/state'?admin({action:'setSite',show:d.show}):post('/api/vote',{id:p.split('/')[1],pre:d.pre,post:d.post}).then(x=>{pull();return x}),
    delete:()=>admin({action:'deleteVote',id:p.split('/')[1]}),
-   onSnapshot:(cb,eb)=>sub(cb,eb,s=>{const o=p==='poll/state'?s.poll:p==='site/state'?s.site:null;return{exists:!!o,data:()=>o}})}),
-  collection:p=>({onSnapshot:(cb,eb)=>sub(cb,eb,s=>({docs:(s.votes||[]).map(v=>({id:v.id,data:()=>({pre:v.pre||undefined,post:v.post||undefined})}))}))})};
+   onSnapshot:(cb,eb)=>sub(cb,eb,s=>{const o=p==='poll/state'?s.poll:p==='site/state'?s.site:null;return[o,{exists:!!o,data:()=>o}]})}),
+  collection:p=>({onSnapshot:(cb,eb)=>sub(cb,eb,s=>[s.votes||[],{docs:(s.votes||[]).map(v=>({id:v.id,data:()=>({pre:v.pre||undefined,post:v.post||undefined})}))}])})};
  let UP=null;
  const user=()=>UP||(UP=(async()=>{let a=false;if(pw()){try{await post('/api/admin',{pw:pw(),action:'check'});a=true}catch(e){if(e&&e.code==='permission-denied'){try{sessionStorage.removeItem('pw')}catch(_){}}}}
   return{id:async()=>uid,canEdit:async()=>a,isOwner:async()=>a,can:async()=>true}})());
@@ -567,7 +567,7 @@ let CUR='map';
 function hdr(R){R=R||dcf(S);const r=rate(R.up);$('#hv').textContent='$'+fm(R.v,2);$('#hu').innerHTML=`<span class="${R.up>=0?'up':'dn'}">${R.up>=0?'+':''}${pct(R.up)}</span>`;$('#hr').innerHTML=`<span class="chip ${r}">${r}</span>`;stat()}
 function stat(){const R=dcf(S),m=MODS.find(x=>x[0]===CUR);$('#status').innerHTML=`<span>Source <b>FACA_challenge_con_WACC.xlsx</b></span><span>Market <b>${LIVE.msg}</b></span><span>View <b>${m?m[2]:''}</b></span><span>Valuation lab <b>$${fm(R.v,2)} · ${rate(R.up)}</b></span><span>US$ unless stated · FY ends late December</span>`}
 $('#rail').innerHTML=MODS.map(([k,n],i)=>`<button role="tab" data-k="${k}" aria-selected="false" aria-label="${MODS[i][2]}"><svg viewBox="0 0 24 24">${ICON[k]}</svg><span>${n}</span></button>${i===0||i===6||i===8?'<hr>':''}`).join('');
-function go(k,node){if(!V[k])k='map';if(!allowed(k))k='vote';CUR=k;PENDING=node||null;$$('#rail button').forEach(b=>b.setAttribute('aria-selected',b.dataset.k===k));$('#main').innerHTML=V[k]();V[k].after&&V[k].after();stat();try{history.replaceState(null,'','#'+k)}catch(e){}scrollTo(0,0)}
+function go(k,node,keep){if(!V[k])k='map';if(!allowed(k))k='vote';CUR=k;PENDING=node||null;$$('#rail button').forEach(b=>b.setAttribute('aria-selected',b.dataset.k===k));$('#main').innerHTML=V[k]();V[k].after&&V[k].after();stat();try{history.replaceState(null,'','#'+k)}catch(e){}keep||scrollTo(0,0)}
 $$('#rail button').forEach(b=>b.onclick=()=>go(b.dataset.k));
 /* object search */
 const IDX=[...MODS.map(m=>({l:m[2].replace(/^(Module \d|Analytics) · /,''),t:m[2].startsWith('Module')?m[2].split(' · ')[0]:m[2].startsWith('Analytics')?'Analytics':'Overview',k:m[0]})),...Object.entries(NODES).map(([k,N])=>({l:N.t,t:'Object · '+N.type,k:'map',n:k})),
@@ -582,8 +582,8 @@ document.addEventListener('keydown',e=>{if(/INPUT|SELECT|TEXTAREA/.test(e.target
 const AV='Alpha Vantage MCP Server';
 const LIVE={src:'model',px:null,day:null,chg:null,msg:'model price (2-Oct) · live feed not loaded',mcp:null,busy:false};
 function pxl(){const l=LIVE.src==='live'?'Price · live '+LIVE.day.slice(5):LIVE.src==='manual'?'Price · manual':'Price · model 2-Oct';$('#pxl').textContent=l;$('#pxr').hidden=Math.abs(PRICE-PRICE0)<.005;$('#lvb').hidden=!LIVE.mcp;$('#lvb').disabled=LIVE.busy}
-function setPrice(v,src){PRICE=v;LIVE.src=src;$('#px').value=v.toFixed(2);pxl();hdr();go(CUR)}
-$('#px').onchange=e=>{const v=parseFloat(e.target.value);if(v>=20&&v<=2000){PRICE=v;LIVE.src=Math.abs(v-PRICE0)<.005?'model':(LIVE.px&&Math.abs(v-LIVE.px)<.005?'live':'manual')}else e.target.value=PRICE;pxl();hdr();go(CUR)};
+function setPrice(v,src){PRICE=v;LIVE.src=src;$('#px').value=v.toFixed(2);pxl();hdr();go(CUR,null,true)}
+$('#px').onchange=e=>{const v=parseFloat(e.target.value);if(v>=20&&v<=2000){PRICE=v;LIVE.src=Math.abs(v-PRICE0)<.005?'model':(LIVE.px&&Math.abs(v-LIVE.px)<.005?'live':'manual')}else e.target.value=PRICE;pxl();hdr();go(CUR,null,true)};
 $('#pxr').onclick=()=>setPrice(PRICE0,'model');
 $('#lvb').onclick=()=>fetchLive(true);
 async function fetchLive(force){
@@ -619,12 +619,12 @@ document.body.classList.add('locked');
 function gateApply(){const all=GATE.admin||GATE.show;document.body.classList.toggle('locked',!all);
  $$('#rail button').forEach(b=>b.hidden=!allowed(b.dataset.k));
  const g=$('#gate');g.hidden=!GATE.admin;g.textContent=GATE.show?'Class view: open':'Class view: locked';g.setAttribute('aria-pressed',String(GATE.show))}
-function boot(again){gateApply();pxl();hdr();go(again?CUR:((location.hash||'').slice(1)||'map'));if((GATE.admin||GATE.show)&&!GATE.fetched){GATE.fetched=true;fetchLive(false)}}
+function boot(again){gateApply();pxl();hdr();go(again?CUR:((location.hash||'').slice(1)||'map'),null,again);if((GATE.admin||GATE.show)&&!GATE.fetched){GATE.fetched=true;fetchLive(false)}}
 $('#gate').onclick=async()=>{if(!GATE.db)return;const g=$('#gate');g.disabled=true;try{await GATE.db.doc('site/state').set({show:!GATE.show})}catch(e){g.textContent='Could not change (no permission)'}g.disabled=false};
 (async()=>{
  try{const c=window.claude;const [user,db]=await Promise.race([Promise.all([c.use('user'),c.use('db')]),new Promise((_,j)=>setTimeout(j,6000))]);
   GATE.admin=!!user&&await user.canEdit();GATE.db=db;
-  if(db)await new Promise(res=>{let first=true;db.doc('site/state').onSnapshot(sn=>{GATE.show=!!(sn.exists&&sn.data().show);if(first){first=false;res()}else boot(true)},()=>{if(first){first=false;res()}})});
+  if(db)await new Promise(res=>{let first=true;db.doc('site/state').onSnapshot(sn=>{const v=!!(sn.exists&&sn.data().show);if(first){GATE.show=v;first=false;res()}else if(v!==GATE.show){GATE.show=v;boot(true)}},()=>{if(first){first=false;res()}})});
  }catch(e){}
  boot(false);
 })();
